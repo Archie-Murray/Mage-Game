@@ -1,5 +1,5 @@
 
-use crate::{animation::AnimationTimer, damage::health::Health};
+use crate::{animation::AnimationTimer, damage::health::{Health, EntityType}};
 use bevy::prelude::*;
 use crate::animation::*;
 
@@ -26,7 +26,7 @@ pub fn spawn_player(mut commands: Commands, assets: Res<AssetServer>, mut textur
     let texture_atlas: TextureAtlas = TextureAtlas::from_grid(texture_handle, Vec2::splat(32.0), 8, 8, None, None);
     commands.spawn((
         Player,
-        Health::new(100.0, 10, 10),
+        Health::new(100.0, 10, 10, EntityType::Player),
         Animations { 
             animation_indices: bevy::utils::hashbrown::HashMap::from([
                 (AnimationType::Idle, AnimationIndices { first: 0, last: 8 })
