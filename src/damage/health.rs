@@ -17,10 +17,10 @@ impl Health {
     }
 
     pub fn damage(&mut self, amount: f32, damageType: DamageType) {
-        if (!self.dead && !self.isInvulnerable) {
+        if !self.dead && !self.isInvulnerable {
             self.currentHealth = f32::max(0.0, self.currentHealth - amount * self.defence_multiplier(damageType));
         }
-        if (self.currentHealth == 0.0) {
+        if self.currentHealth == 0.0 {
             self.dead = true;
         }
     }

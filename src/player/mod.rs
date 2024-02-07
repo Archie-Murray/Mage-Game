@@ -46,7 +46,7 @@ pub fn animate_player(
 ) {
     for (animation, mut timer, mut sprite) in &mut player_query {
         timer.0.tick(time.delta());
-        if (timer.0.just_finished()) {
+        if timer.0.just_finished() {
             sprite.index = if sprite.index == animation.last {
                 animation.first
             } else {
