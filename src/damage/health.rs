@@ -71,9 +71,9 @@ impl Health {
             self.current_health = f32::max(0.0, self.current_health - amount);
             self.damage_timer.timer.reset();
             self.damage_timer.amount = amount;
-        }
-        if self.current_health == 0.0 {
-            self.dead = true;
+            if self.current_health == 0.0 {
+                self.dead = true;
+            }
         }
     }
 
