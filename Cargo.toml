@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 bevy = "0.12.1"
 bevy-inspector-egui = "0.22.1"
-bevy_rapier2d = "0.24.0"
+bevy_rapier2d = { version = "0.24.0", features = [ "simd-stable", "parallel" ] }
 
 [workspace]
 resolver = "2"

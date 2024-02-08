@@ -25,7 +25,7 @@ impl Default for Stats {
             (StatType::Health, 100.0),
             (StatType::Defence, 10.0),
             (StatType::MagicDefence, 10.0),
-            (StatType::Speed, 100.0),
+            (StatType::Speed, 50.0),
             (StatType::Attack, 25.0),
             (StatType::Magic, 20.0)
         ])}
