@@ -1,11 +1,17 @@
 use std::time::Duration;
 use bevy::prelude::*;
+use bevy_inspector_egui::prelude::*;
 use bevy::utils::hashbrown::HashMap;
+
+use bevy::reflect::*;
 
 use crate::animation::{looping_animator::LoopingAnimator, *};
 
+#[derive(Reflect, InspectorOptions)]
+#[reflect(InspectorOptions)]
 pub enum EffectType { Slow, Damage, Heal, Stun }
 
+#[derive(Reflect)]
 pub struct AbilityData {
     pub id: u32,
     pub cooldown: f32,
@@ -13,7 +19,7 @@ pub struct AbilityData {
     pub magnitude: f32
 }
 
-#[derive(Component)]
+#[derive(Component, Reflect)]
 pub struct AbilitySystem {
     pub abilities: Vec<Ability>
 }
@@ -29,6 +35,7 @@ impl Default for AbilityBundle {
     }
 }
 
+#[derive(Reflect)]
 pub struct Ability {
     pub ability_data: AbilityData,
     pub cooldown_timer: Timer,
