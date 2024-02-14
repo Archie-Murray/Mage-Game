@@ -1,17 +1,6 @@
 use bevy::prelude::*;
 use bevy::utils::hashbrown::HashMap;
-pub struct AnimationIndices {
-    pub first: usize,
-    pub last: usize
-}
-
-pub const DEFAULT: AnimationIndices = AnimationIndices { first: 0, last: 0 };
-
-impl Default for AnimationIndices {
-    fn default() -> Self {
-        return AnimationIndices { first: 0, last: 0 }
-    }
-}
+use super::*;
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
 pub enum AnimationType { Idle, Walk, Run, Cast, SpecialCast }
@@ -28,7 +17,7 @@ pub fn vec2_to_direction(vector: &Vec2) -> AnimationDirection {
 }
 
 #[derive(Component)]
-pub struct Animations {
+pub struct DirectionalAnimator {
     pub animation_indices: HashMap<AnimationType, HashMap<AnimationDirection, AnimationIndices>>,
     pub current: AnimationType,
     pub previous: AnimationType,
@@ -36,7 +25,7 @@ pub struct Animations {
     pub previous_dir: AnimationDirection,
 }
 
-impl Animations {
+impl DirectionalAnimator {
     pub fn update_animation(&mut self, animation: AnimationType) {
         self.previous = self.current;
         self.current = animation;
@@ -55,10 +44,4 @@ impl Animations {
         }
         return &DEFAULT;
     }
-}
-
-#[derive(Component)]
-pub struct AnimationTimer {
-    pub timer: Timer,
-    pub is_animating: bool
 }

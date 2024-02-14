@@ -1,4 +1,5 @@
 use crate::animation::*;
+use crate::animation::directional_animator::*;
 use crate::{
     damage::health::{EntityType, Health},
     entity::{stat_type::StatType, stats::Stats},
@@ -6,6 +7,7 @@ use crate::{
 use bevy::utils::hashbrown::HashMap;
 use bevy_rapier2d::prelude::*;
 use crate::player::Player;
+use crate::player::abilities::*;
 
 use bevy::prelude::*;
 pub fn player_move_input(
@@ -35,48 +37,24 @@ pub fn spawn_player(
     commands.spawn((
         Player,
         Health::new(100.0, 10, 10, EntityType::Player),
-        Animations {
+        DirectionalAnimator {
             animation_indices: HashMap::from([
                 (
                     AnimationType::Idle,
                     HashMap::from([
-                        (
-                            AnimationDirection::Up,
-                            AnimationIndices { first: 0, last: 0 },
-                        ),
-                        (
-                            AnimationDirection::Down,
-                            AnimationIndices { first: 6, last: 6 },
-                        ),
-                        (
-                            AnimationDirection::Left,
-                            AnimationIndices { first: 9, last: 9 },
-                        ),
-                        (
-                            AnimationDirection::Right,
-                            AnimationIndices { first: 3, last: 3 },
-                        ),
+                        ( AnimationDirection::Up, AnimationIndices { first: 0, last: 0 },),
+                        ( AnimationDirection::Down, AnimationIndices { first: 6, last: 6 },),
+                        ( AnimationDirection::Left, AnimationIndices { first: 9, last: 9 },),
+                        ( AnimationDirection::Right, AnimationIndices { first: 3, last: 3 },),
                     ]),
                 ),
                 (
                     AnimationType::Walk,
                     HashMap::from([
-                        (
-                            AnimationDirection::Up,
-                            AnimationIndices { first: 0, last: 2 },
-                        ),
-                        (
-                            AnimationDirection::Down,
-                            AnimationIndices { first: 6, last: 8 },
-                        ),
-                        (
-                            AnimationDirection::Left,
-                            AnimationIndices { first: 9, last: 11 },
-                        ),
-                        (
-                            AnimationDirection::Right,
-                            AnimationIndices { first: 3, last: 5 },
-                        ),
+                        ( AnimationDirection::Up, AnimationIndices { first: 0, last: 2 },),
+                        ( AnimationDirection::Down, AnimationIndices { first: 6, last: 8 },),
+                        ( AnimationDirection::Left, AnimationIndices { first: 9, last: 11 },),
+                        ( AnimationDirection::Right, AnimationIndices { first: 3, last: 5 },),
                     ]),
                 ),
             ]),
@@ -104,6 +82,7 @@ pub fn spawn_player(
         },
         Collider::ball(0.5),
         Stats::default(),
+        AbilitySystem::default(),
     ));
 }
 
@@ -111,7 +90,7 @@ pub fn animate_player(
     time: Res<Time>,
     mut player_query: Query<
         (
-            &mut Animations,
+            &mut DirectionalAnimator,
             &Velocity,
             &mut AnimationTimer,
             &mut TextureAtlasSprite,
