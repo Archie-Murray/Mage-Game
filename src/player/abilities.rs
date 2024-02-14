@@ -82,7 +82,7 @@ fn init_abilites(
         (1u32, SpriteSheetBundle { 
             texture_atlas: texture_atlases.add(TextureAtlas::from_grid(asset_server.load("abilities/ice_storm.png"), Vec2::splat(32.0), 5, 1, None, None)),
             sprite: TextureAtlasSprite::new(0), 
-            transform: Transform::from_scale(Vec3::splat(1.0)),
+            transform: Transform::from_scale(Vec3::splat(5.0)),
             .. default()
         }),        
         (2u32, SpriteSheetBundle { 

@@ -23,7 +23,7 @@ pub fn player_move_input(
     );
     let (mut velocity, stats) = query.single_mut();
     velocity.linvel =
-        time.delta_seconds() * *stats.get_stat(StatType::Speed).unwrap_or(&50.0) * input;
+        time.delta_seconds() * *stats.get_stat(StatType::Speed).unwrap_or(&50.0) * 100.0 * input;
 }
 
 pub fn spawn_player(
