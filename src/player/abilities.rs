@@ -1,6 +1,7 @@
+use std::time::Duration;
+
 use bevy::prelude::*;
 use bevy::utils::hashbrown::HashMap;
-use crate::damage::health::Health;
 
 enum EffectType { Slow, Damage, Heal, Stun }
 
@@ -18,6 +19,12 @@ pub struct AbilitySystem {
 #[derive(Resource)]
 pub struct AbilityBundle {
     pub sprites: HashMap<u32, SpriteBundle>
+}
+
+impl Default for AbilityBundle {
+    fn default() -> Self {
+        return AbilityBundle { sprites: HashMap::new() };
+    }
 }
 
 pub struct Ability {
@@ -47,26 +54,26 @@ fn init_abilites(
 
 impl AbilitySystem {
 
-    pub fn can_use(&self, &ability: Ability) -> bool {
+    pub fn can_use(&self, ability: &Ability) -> bool {
         return ability.cooldown_timer.finished();
     }
 
-    pub fn use_ability(&self, ability: &mut Ability, pos: Vec3, mut commands: Commands, abilities: ResMut<AbilityBundle>) {
-        ability.cooldown_timer.set_duration(self.ability_data.cooldown);
+    pub fn use_ability(&self, ability: &mut Ability, pos: Vec3, mut commands: Commands, mut abilities: ResMut<AbilityBundle>) {
+        ability.cooldown_timer.set_duration(Duration::from_secs_f32(ability.ability_data.cooldown));
         ability.cooldown_timer.reset();
-        if let Some(mut ability_sprite) = abilities.sprites.get_mut(&ability.id) {
+        if let Some(mut ability_sprite) = abilities.sprites.get_mut(&ability.ability_data.id).cloned() {
             ability_sprite.transform.translation = pos;
-            commands.spawn(match ability.ability_data.effect_type {
-                EffectType::Slow => (ability_sprite, Slow { speed_reduction: ability.ability_data.magnitude }),
-                EffectType::Damage => (ability_sprite, Damage { damage_amount: ability.ability_data.magnitude }),
-                EffectType::Heal => (ability_sprite, Heal { heal_amount: ability.ability_data.magnitude }),
-                EffectType::Stun => (ability_sprite, Stun { stun_duration: ability.ability_data.magnitude }),
-            });
+            match ability.ability_data.effect_type {
+                EffectType::Slow => commands.spawn((ability_sprite, Slow { speed_reduction: ability.ability_data.magnitude })),
+                EffectType::Damage => commands.spawn((ability_sprite, Damage { damage_amount: ability.ability_data.magnitude })),
+                EffectType::Heal => commands.spawn((ability_sprite, Heal { heal_amount: ability.ability_data.magnitude })),
+                EffectType::Stun => commands.spawn((ability_sprite, Stun { stun_duration: ability.ability_data.magnitude })),
+            };
         }
     }
 
     pub fn update_ability(&self, ability: &mut Ability, delta_time: f32) {
-        ability.cooldown_timer.tick(delta_time);
+        ability.cooldown_timer.tick(Duration::from_secs_f32(delta_time));
         if self.can_use(ability) {
             ability.done = true;
         }

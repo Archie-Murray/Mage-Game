@@ -5,6 +5,7 @@ use crate::{
 };
 use bevy::utils::hashbrown::HashMap;
 use bevy_rapier2d::prelude::*;
+use crate::player::Player;
 
 use bevy::prelude::*;
 pub fn player_move_input(

@@ -10,7 +10,7 @@ fn main() {
         .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         .add_plugins(GamePlugin)
-        .add_plugins(player::PlayerPlugin)
+        .add_plugins(player::playerplugin::PlayerPlugin)
         .run();
 }
 
