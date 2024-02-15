@@ -2,26 +2,37 @@ use std::time::Duration;
 use bevy::prelude::*;
 use bevy_inspector_egui::prelude::*;
 use bevy::utils::hashbrown::HashMap;
-use bevy::window::PrimaryWindow;
 
 use bevy_rapier2d::prelude::*;
 
-use bevy::reflect::*;
-
 use crate::input::Mouse;
 
-use crate::animation::{looping_animator::LoopingAnimator, *};
+use crate::animation::looping_animator::LoopingAnimator;
 
 #[derive(Reflect, InspectorOptions)]
 #[reflect(InspectorOptions)]
 pub enum EffectType { Slow, Damage, Heal, Stun }
 
+#[derive(Reflect, InspectorOptions, Hash, PartialEq, Eq)]
+#[reflect(InspectorOptions)]
+pub enum AbilityType { FireBall, IceStorm, HealOrb }
+
 #[derive(Reflect)]
 pub struct AbilityData {
-    pub id: u32,
+    pub id: AbilityType,
     pub cooldown: f32,
-    pub effect_type: EffectType,
-    pub magnitude: f32
+    pub magnitude: f32,
+    pub speed: f32
+}
+
+impl AbilityData {
+    pub fn from_type(ability_type: AbilityType) -> Self {
+        return match ability_type {
+            AbilityType::FireBall => AbilityData { id: AbilityType::FireBall, cooldown: 2.0, magnitude: 5.0, speed: 100.0 },
+            AbilityType::IceStorm => AbilityData { id: AbilityType::IceStorm, cooldown: 5.0, magnitude: 1.0, speed: 25.0 },
+            AbilityType::HealOrb => AbilityData { id: AbilityType::HealOrb, cooldown: 10.0, magnitude: 10.0, speed: 0.0 }
+        };
+    }
 }
 
 #[derive(Component, Reflect)]
@@ -31,7 +42,7 @@ pub struct AbilitySystem {
 
 #[derive(Resource)]
 pub struct AbilityBundle {
-    pub sprites: HashMap<u32, SpriteSheetBundle>
+    pub sprites: HashMap<AbilityType, SpriteSheetBundle>
 }
 
 impl Default for AbilityBundle {
@@ -48,8 +59,9 @@ pub struct Ability {
 }
 
 impl Ability {
-    fn new(ability_data: AbilityData) -> Self {
-        return Ability { cooldown_timer: Timer::new(Duration::from_secs_f32(ability_data.cooldown), TimerMode::Once), ability_data, done: true };
+    fn new(ability_type: AbilityType) -> Self {
+        let data = AbilityData::from_type(ability_type);
+        return Ability { cooldown_timer: Timer::new(Duration::from_secs_f32(data.cooldown), TimerMode::Once), ability_data: data, done: true };
     }
 
     pub fn can_use(&self) -> bool {
@@ -61,6 +73,12 @@ impl Ability {
         if self.can_use() {
             self.done = true;
         }
+    }
+}
+
+impl AbilitySystem {
+    pub fn get_ability(&mut self, slot: usize) -> Option<&mut Ability> {
+        return self.abilities.get_mut(slot);
     }
 }
 
@@ -78,19 +96,19 @@ fn init_abilites(
     mut abilities: ResMut<AbilityBundle>, asset_server: Res<AssetServer>, mut texture_atlases: ResMut<Assets<TextureAtlas>>
 ) {
     abilities.sprites = HashMap::from([
-        (0u32, SpriteSheetBundle { 
+        (AbilityType::FireBall, SpriteSheetBundle { 
             texture_atlas: texture_atlases.add(TextureAtlas::from_grid(asset_server.load("abilities/fire_ball.png"), Vec2::splat(32.0), 5, 1, None, None)),
             sprite: TextureAtlasSprite::new(0), 
             transform: Transform::from_scale(Vec3::splat(1.0)), 
             .. default()
         }),
-        (1u32, SpriteSheetBundle { 
-            texture_atlas: texture_atlases.add(TextureAtlas::from_grid(asset_server.load("abilities/ice_storm.png"), Vec2::splat(32.0), 5, 1, None, None)),
+        (AbilityType::IceStorm, SpriteSheetBundle { 
+            texture_atlas: texture_atlases.add(TextureAtlas::from_grid(asset_server.load("abilities/ice_storm.png"), Vec2::splat(64.0), 5, 1, None, None)),
             sprite: TextureAtlasSprite::new(0), 
-            transform: Transform::from_scale(Vec3::splat(5.0)),
+            transform: Transform::from_scale(Vec3::splat(1.0)),
             .. default()
         }),        
-        (2u32, SpriteSheetBundle { 
+        (AbilityType::HealOrb, SpriteSheetBundle { 
             texture_atlas: texture_atlases.add(TextureAtlas::from_grid(asset_server.load("abilities/heal_orb.png"), Vec2::splat(32.0), 5, 1, None, None)),
                         sprite: TextureAtlasSprite::new(0), 
             transform: Transform::from_scale(Vec3::splat(1.0)),
@@ -105,56 +123,94 @@ pub fn update_abilities(mut query: Query<&mut AbilitySystem>, time: Res<Time>) {
     }
 }
 
+fn is_ability_key(key_code: KeyCode) -> bool {
+    return key_code == KeyCode::Q || key_code == KeyCode::E || key_code == KeyCode::R;
+}
+
+fn get_ability_slot(key_code: &KeyCode) -> Option<usize> {
+    return match key_code {
+        KeyCode::Q => Some(0),
+        KeyCode::E => Some(1),
+        KeyCode::R => Some(2),
+        _ => None
+    };
+}
+
 pub fn cast_ability(
-    mut commands: Commands,
-    mut ability_sprites: ResMut<AbilityBundle>,
+    commands: Commands,
+    ability_sprites: ResMut<AbilityBundle>,
     mut query: Query<(&mut AbilitySystem, &Transform)>,
     mouse: Res<Mouse>,
     keyboard: Res<Input<KeyCode>>,
 ) {
-    if keyboard.just_pressed(KeyCode::Q) {
-        let (mut ability_system, transform) = query.single_mut();
-        if let Some(mut ability) = ability_system.abilities.iter_mut().next() {
-            let mouse_diff: Vec2 = (mouse.world_position - Vec2::new(transform.translation.x, transform.translation.y)).normalize();
-            if ability.can_use() {
-                use_ability(ability, transform.translation, Quat::from_axis_angle(Vec3::new(0.0, 0.0, -1.0), Vec2::angle_between(mouse_diff, Vec2::new(0.0, -1.0)) + (std::f32::consts::PI / 2.0)), commands, ability_sprites);
-            }
-        }
+    let (mut ability_system, transform) = query.single_mut();
+    let Some(slot) = get_ability_slot(
+        keyboard.get_just_pressed().filter(|key_code| is_ability_key(**key_code)).next()
+        .unwrap_or(&KeyCode::NoConvert)) else { return; };
+    let Some(ability ) = ability_system.get_ability(slot) else { return; };
+    let mouse_diff = (mouse.world_position - Vec2::new(transform.translation.x, transform.translation.y)).normalize();
+    if ability.can_use() {
+        let rotation = Quat::from_axis_angle(
+            Vec3::new(0.0, 0.0, -1.0), 
+            Vec2::angle_between(mouse_diff, Vec2::new(0.0, -1.0)) + std::f32::consts::FRAC_PI_2
+        );
+        use_ability(ability, transform, rotation, commands, ability_sprites);
     }
+
 }
-fn use_ability(ability: &mut Ability, pos: Vec3, rotation: Quat, mut commands: Commands, mut ability_sprites: ResMut<AbilityBundle>) {
+
+fn use_ability(ability: &mut Ability, origin: &Transform, rotation: Quat, mut commands: Commands, mut ability_sprites: ResMut<AbilityBundle>) {
     ability.cooldown_timer.set_duration(Duration::from_secs_f32(ability.ability_data.cooldown));
     ability.cooldown_timer.reset();
     if let Some(mut ability_sprite) = ability_sprites.sprites.get_mut(&ability.ability_data.id).cloned() {
-        let angle: f32 = rotation.xyz().z;
-        ability_sprite.transform.translation = pos;
-        match ability.ability_data.effect_type {
-            EffectType::Slow => {
-                let (mut ability_instance , slow, animator, rb, vel) = (
+        let (_, _, angle) = rotation.to_euler(EulerRot::XYZ);
+        ability_sprite.transform.translation = origin.translation + rotation.mul_vec3(Vec3::new(1.0, 0.0, 0.0)) * 64.0;
+        match ability.ability_data.id {
+            AbilityType::FireBall => {
+                let (mut ability_instance , damage, animator, grav, rb, constraints, coll, sensor , vel) = (
                     ability_sprite, 
-                    Slow { speed_reduction: ability.ability_data.magnitude }, 
+                    Damage { damage_amount: ability.ability_data.magnitude }, 
                     LoopingAnimator::new(4, 0.2),
+                    GravityScale(0.0),
                     RigidBody::Dynamic,
-                    Velocity { linvel: Vec2::from_angle(angle), angvel: 0.0 }
+                    LockedAxes::ROTATION_LOCKED,
+                    Collider::ball(32.0),
+                    Sensor,
+                    Velocity { linvel: Vec2::from_angle(angle) * ability.ability_data.speed, angvel: 0.0 }
                 ); 
                 ability_instance.transform.rotation = rotation;
-                commands.spawn((ability_instance, slow, animator));
+                commands.spawn((ability_instance , damage, animator, grav, rb, constraints, coll, sensor, vel));
             },
-            EffectType::Damage => {
-                let (mut ability_instance , damage, animator) = (ability_sprite, Damage { damage_amount: ability.ability_data.magnitude }, LoopingAnimator::new(4, 0.2)); 
+            AbilityType::IceStorm => {
+                let (mut ability_instance, damage_over_time , slow, animator, grav, rb, constraints, coll, sensor, vel) = (
+                    ability_sprite, 
+                    DamageOverTime { tick_damage: ability.ability_data.magnitude }, 
+                    Slow { speed_reduction: ability.ability_data.magnitude * 10.0 },
+                    LoopingAnimator::new(4, 0.2),
+                    GravityScale(0.0),
+                    RigidBody::KinematicVelocityBased,
+                    LockedAxes::ROTATION_LOCKED,
+                    Collider::ball(64.0),
+                    Sensor,
+                    Velocity { linvel: Vec2::from_angle(angle) * ability.ability_data.speed, angvel: std::f32::consts::FRAC_PI_4 },
+                ); 
                 ability_instance.transform.rotation = rotation;
-                commands.spawn((ability_instance, damage, animator));
+                commands.spawn((ability_instance, damage_over_time , slow, animator, grav, rb, constraints, coll, sensor, vel));
             },
-            EffectType::Heal => {
-                let (mut ability_instance , heal, animator) = (ability_sprite, Heal { heal_amount: ability.ability_data.magnitude }, LoopingAnimator::new(4, 0.2)); 
-                ability_instance.transform.rotation = rotation;
-                commands.spawn((ability_instance, heal, animator));
-            },
-            EffectType::Stun => {
-                let (mut ability_instance , stun) = (ability_sprite, Stun { stun_duration: ability.ability_data.magnitude }); 
-                ability_instance.transform.rotation = rotation;
-                commands.spawn((ability_instance, stun));
-            },     
+            AbilityType::HealOrb => {
+                let (mut ability_instance , heal, grav, rb, constraints, coll, sensor, vel) = (
+                    ability_sprite, 
+                    Heal { heal_amount: ability.ability_data.magnitude }, 
+                    GravityScale(0.0),
+                    RigidBody::Dynamic,
+                    LockedAxes::ROTATION_LOCKED,
+                    Collider::ball(32.0),
+                    Sensor,
+                    Velocity { linvel: Vec2::ZERO, angvel: 0.0 }
+                );
+                ability_instance.transform.rotation = Quat::IDENTITY;
+                commands.spawn((ability_instance , heal, grav, rb, constraints, coll, sensor, vel));
+            }
         };
     }
 }
@@ -162,7 +218,13 @@ fn use_ability(ability: &mut Ability, pos: Vec3, rotation: Quat, mut commands: C
 
 impl Default for AbilitySystem {
     fn default() -> Self {
-        return AbilitySystem { abilities: vec![Ability::new(AbilityData { id: 0u32, cooldown: 2.0, magnitude: 5.0, effect_type: EffectType::Damage })] };
+        return AbilitySystem { 
+            abilities: vec![
+                Ability::new(AbilityType::FireBall),
+                Ability::new(AbilityType::IceStorm),
+                Ability::new(AbilityType::HealOrb)
+            ]
+        };
     }
 }
 
@@ -179,6 +241,11 @@ pub struct Slow {
 #[derive(Component)]
 pub struct Damage {
     pub damage_amount: f32
+}
+
+#[derive(Component)]
+pub struct DamageOverTime {
+    pub tick_damage: f32
 }
 
 #[derive(Component)]
