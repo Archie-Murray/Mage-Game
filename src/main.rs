@@ -29,10 +29,12 @@ fn main() {
             ),
         )
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(1.0))
+        .add_plugins(RapierDebugRenderPlugin::default())
         .add_plugins(GamePlugin)
         .add_plugins(input::InputPlugin)
         .add_plugins(WorldInspectorPlugin::new())
         .register_type::<player::abilities::AbilitySystem>()
+        .add_plugins(damage::health::HealthPlugin)
         .add_plugins(player::playerplugin::PlayerPlugin)
         .add_plugins(player::abilities::AbilitySystemPlugin)
         .add_plugins(animation::AnimatorPlugin)

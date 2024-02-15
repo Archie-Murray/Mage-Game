@@ -1,16 +1,38 @@
 use bevy::prelude::*;
 use crate::damage::damagetype::DamageType;
 use crate::damage;
+use bevy::utils::hashbrown::HashMap;
+
+pub struct HealthPlugin;
+
+impl Plugin for HealthPlugin {
+    fn build(&self, app: &mut App) {
+        app
+            .add_event::<HealthDamageEvent>()
+            .add_event::<HealthDeathEvent>()
+            .add_systems(Update, health_update);
+    }
+}
+
 #[derive(Component)]
 pub struct Health {
     current_health: f32,
     max_health: f32,
     magical_defence: i32,
-    phyiscal_defence: i32,
+    physical_defence: i32,
     dead: bool,
     is_invulnerable: bool,
     damage_timer: DamageTimer,
-    entity_type: EntityType
+    entity_type: EntityType,
+    dots: HashMap<u32, DOT>
+}
+
+#[derive(Clone, Copy)]
+pub struct DOT {
+    pub tick_damage: f32, 
+    pub duration: f32, 
+    pub damage_type: DamageType,
+    pub finished: bool
 }
 
 pub struct DamageTimer {
@@ -42,8 +64,6 @@ pub struct HealthDeathEvent {
     entity_type: EntityType
 }
 
-pub fn on_health_damage(reader: &mut EventReader<HealthDamageEvent>) {}
-pub fn on_health_death(reader: &mut EventReader<HealthDamageEvent>) {}
 pub fn health_update(
     time: Res<Time>, 
     mut ev_damage: EventWriter<HealthDamageEvent>, 
@@ -51,18 +71,35 @@ pub fn health_update(
     mut query: Query<(&mut Health, Entity)> // Adapt to use health UI later
 ) {
     for (mut health, entity) in query.iter_mut() {
-        if !health.damage_timer.timer.finished() {
+        if health.damage_timer.timer.percent() <= 0.0 {
             ev_damage.send(HealthDamageEvent { entity,  entity_type: health.entity_type.clone(), amount: health.damage_timer.amount });
             if health.dead {
                 ev_death.send( HealthDeathEvent { entity, entity_type: health.entity_type.clone() });
             }
+        }
+
+        if health.dots.len() == 0 {
+            return;
+        }
+
+        let mut finished: Vec<u32> = Vec::new();
+
+        for (entity, mut dot) in health.dots.iter_mut() {
+            dot.duration = (dot.duration - time.delta_seconds()).max(0.0);
+            if dot.duration == 0.0 {
+                finished.push(*entity);
+            }
+        }
+
+        for id in finished {
+            health.dots.remove(&id);
         }
     }
 }
 
 impl Health {
     pub fn new(health: f32, physical_defence: i32, magical_defence: i32, entity_type: EntityType) -> Health {
-        return Self { current_health: health, max_health: health, magical_defence, phyiscal_defence: physical_defence, dead: false, is_invulnerable: false, damage_timer: DamageTimer { timer: Timer::from_seconds(0.25, TimerMode::Once), amount: 0.0 }, entity_type }
+        return Self { current_health: health, max_health: health, magical_defence, physical_defence, dead: false, is_invulnerable: false, damage_timer: DamageTimer { timer: Timer::from_seconds(0.25, TimerMode::Once), amount: 0.0 }, entity_type, dots: HashMap::new() }
     }
 
     pub fn damage(&mut self, mut amount: f32, damage_type: DamageType) {
@@ -77,9 +114,18 @@ impl Health {
         }
     }
 
+    pub fn heal(&mut self, mut amount: f32) {
+        amount = amount.max(0.0);
+        self.current_health = self.max_health.min(self.current_health + amount);
+    }
+
+    pub fn add_dot(&mut self, damage_per_second: f32, duration: f32, damage_type: DamageType, entity_id: u32) {
+        self.dots.insert(entity_id, DOT { tick_damage: damage_per_second, duration, damage_type, finished: false });
+    }
+
     fn defence_multiplier(&mut self, damage_type: DamageType) -> f32 {
         return match damage_type {
-            DamageType::PHYSICAL => damage::multiplier_from_defence(self.phyiscal_defence),
+            DamageType::PHYSICAL => damage::multiplier_from_defence(self.physical_defence),
             DamageType::MAGICAL => damage::multiplier_from_defence(self.magical_defence),
             _ => 1.0
         };
