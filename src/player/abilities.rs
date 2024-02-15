@@ -2,8 +2,11 @@ use std::time::Duration;
 use bevy::prelude::*;
 use bevy_inspector_egui::prelude::*;
 use bevy::utils::hashbrown::HashMap;
+use bevy::window::PrimaryWindow;
 
 use bevy::reflect::*;
+
+use crate::input::Mouse;
 
 use crate::animation::{looping_animator::LoopingAnimator, *};
 
@@ -104,27 +107,45 @@ pub fn cast_ability(
     mut commands: Commands,
     mut ability_sprites: ResMut<AbilityBundle>,
     mut query: Query<(&mut AbilitySystem, &Transform)>,
-    keyboard: Res<Input<KeyCode>>
+    mouse: Res<Mouse>,
+    keyboard: Res<Input<KeyCode>>,
 ) {
-    let (mut ability_system, transform) = query.single_mut();
     if keyboard.just_pressed(KeyCode::Q) {
+        let (mut ability_system, transform) = query.single_mut();
         if let Some(mut ability) = ability_system.abilities.iter_mut().next() {
+            let mouse_diff: Vec2 = (mouse.world_position - Vec2::new(transform.translation.x, transform.translation.y)).normalize();
             if ability.can_use() {
-                use_ability(ability, transform.translation, commands, ability_sprites);
+                use_ability(ability, transform.translation, Quat::from_axis_angle(Vec3::new(0.0, 0.0, -1.0), Vec2::angle_between(mouse_diff, Vec2::new(0.0, -1.0)) + (std::f32::consts::PI / 2.0)), commands, ability_sprites);
             }
         }
     }
 }
-fn use_ability(ability: &mut Ability, pos: Vec3, mut commands: Commands, mut ability_sprites: ResMut<AbilityBundle>) {
+fn use_ability(ability: &mut Ability, pos: Vec3, rotation: Quat, mut commands: Commands, mut ability_sprites: ResMut<AbilityBundle>) {
     ability.cooldown_timer.set_duration(Duration::from_secs_f32(ability.ability_data.cooldown));
     ability.cooldown_timer.reset();
     if let Some(mut ability_sprite) = ability_sprites.sprites.get_mut(&ability.ability_data.id).cloned() {
         ability_sprite.transform.translation = pos;
         match ability.ability_data.effect_type {
-            EffectType::Slow => commands.spawn((ability_sprite, Slow { speed_reduction: ability.ability_data.magnitude }, LoopingAnimator::new(4, 0.2))),
-            EffectType::Damage => commands.spawn((ability_sprite, Damage { damage_amount: ability.ability_data.magnitude }, LoopingAnimator::new(4, 0.2))),
-            EffectType::Heal => commands.spawn((ability_sprite, Heal { heal_amount: ability.ability_data.magnitude }, LoopingAnimator::new(4, 0.2))),
-            EffectType::Stun => commands.spawn((ability_sprite, Stun { stun_duration: ability.ability_data.magnitude })),
+            EffectType::Slow => {
+                let (mut ability_instance , slow, animator) = (ability_sprite, Slow { speed_reduction: ability.ability_data.magnitude }, LoopingAnimator::new(4, 0.2)); 
+                ability_instance.transform.rotation = rotation;
+                commands.spawn((ability_instance, slow, animator));
+            },
+            EffectType::Damage => {
+                let (mut ability_instance , damage, animator) = (ability_sprite, Damage { damage_amount: ability.ability_data.magnitude }, LoopingAnimator::new(4, 0.2)); 
+                ability_instance.transform.rotation = rotation;
+                commands.spawn((ability_instance, damage, animator));
+            },
+            EffectType::Heal => {
+                let (mut ability_instance , heal, animator) = (ability_sprite, Heal { heal_amount: ability.ability_data.magnitude }, LoopingAnimator::new(4, 0.2)); 
+                ability_instance.transform.rotation = rotation;
+                commands.spawn((ability_instance, heal, animator));
+            },
+            EffectType::Stun => {
+                let (mut ability_instance , stun) = (ability_sprite, Stun { stun_duration: ability.ability_data.magnitude }); 
+                ability_instance.transform.rotation = rotation;
+                commands.spawn((ability_instance, stun));
+            },     
         };
     }
 }

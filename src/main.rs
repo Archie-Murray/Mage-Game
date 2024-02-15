@@ -7,6 +7,7 @@ mod player;
 mod damage;
 mod animation;
 mod entity;
+mod input;
 
 fn main() {
     App::new()
@@ -29,6 +30,7 @@ fn main() {
         )
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(1.0))
         .add_plugins(GamePlugin)
+        .add_plugins(input::InputPlugin)
         .add_plugins(WorldInspectorPlugin::new())
         .register_type::<player::abilities::AbilitySystem>()
         .add_plugins(player::playerplugin::PlayerPlugin)
@@ -45,9 +47,12 @@ impl Plugin for GamePlugin {
     }
 }
 
+#[derive(Component)]
+pub struct MainCamera;
+
 fn spawn_camera(mut commands: Commands) {
     let camera: Camera2dBundle = Camera2dBundle { ..default() };
-    commands.spawn(camera);
+    commands.spawn((camera, MainCamera));
 }
 
 fn set_icon(windows: NonSend<WinitWindows>) {
@@ -61,3 +66,5 @@ fn set_icon(windows: NonSend<WinitWindows>) {
         window.set_window_icon(Some(icon.clone()));
     }
 }
+
+
