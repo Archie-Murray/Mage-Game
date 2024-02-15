@@ -80,7 +80,7 @@ pub fn spawn_player(
             linvel: Vec2::ZERO,
             angvel: 0.0,
         },
-        Collider::ball(0.5),
+        Collider::capsule_y(16.0, 12.0),
         Stats::default(),
         AbilitySystem::default(),
     ));

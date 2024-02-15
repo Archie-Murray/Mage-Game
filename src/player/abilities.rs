@@ -9,6 +9,10 @@ use crate::input::Mouse;
 
 use crate::animation::looping_animator::LoopingAnimator;
 
+use crate::damage::{health::Health, damagetype::DamageType};
+use crate::entity::stats::Stats;
+use crate::player::Player;
+
 #[derive(Reflect, InspectorOptions)]
 #[reflect(InspectorOptions)]
 pub enum EffectType { Slow, Damage, Heal, Stun }
@@ -88,7 +92,7 @@ impl Plugin for AbilitySystemPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<AbilityBundle>();
         app.add_systems(Startup, init_abilites);
-        app.add_systems(Update, (update_abilities, cast_ability));
+        app.add_systems(Update, (update_abilities, cast_ability, heal, player_dot, player_damage));
     }
 }
 
@@ -167,24 +171,29 @@ fn use_ability(ability: &mut Ability, origin: &Transform, rotation: Quat, mut co
         ability_sprite.transform.translation = origin.translation + rotation.mul_vec3(Vec3::new(1.0, 0.0, 0.0)) * 64.0;
         match ability.ability_data.id {
             AbilityType::FireBall => {
-                let (mut ability_instance , damage, animator, grav, rb, constraints, coll, sensor , vel) = (
+                let (mut ability_instance , damage, animator, 
+                         grav, rb, constraints, coll, sensor , vel, ability
+                ) = (
                     ability_sprite, 
-                    Damage { damage_amount: ability.ability_data.magnitude }, 
+                    Damage { damage_amount: ability.ability_data.magnitude, damage_type: DamageType::MAGICAL }, 
                     LoopingAnimator::new(4, 0.2),
                     GravityScale(0.0),
                     RigidBody::Dynamic,
                     LockedAxes::ROTATION_LOCKED,
                     Collider::ball(32.0),
                     Sensor,
-                    Velocity { linvel: Vec2::from_angle(angle) * ability.ability_data.speed, angvel: 0.0 }
+                    Velocity { linvel: Vec2::from_angle(angle) * ability.ability_data.speed, angvel: 0.0 },
+                    AbilityTag
                 ); 
                 ability_instance.transform.rotation = rotation;
-                commands.spawn((ability_instance , damage, animator, grav, rb, constraints, coll, sensor, vel));
+                commands.spawn((ability_instance , damage, animator, grav, rb, constraints, coll, sensor, vel, ability));
             },
             AbilityType::IceStorm => {
-                let (mut ability_instance, damage_over_time , slow, animator, grav, rb, constraints, coll, sensor, vel) = (
+                let (mut ability_instance, damage_over_time , slow, animator, 
+                         grav, rb, constraints, coll, sensor, vel, ability
+                ) = (
                     ability_sprite, 
-                    DamageOverTime { tick_damage: ability.ability_data.magnitude }, 
+                    DamageOverTime { tick_damage: ability.ability_data.magnitude, damage_type: DamageType::PHYSICAL, duration: 0.5 }, 
                     Slow { speed_reduction: ability.ability_data.magnitude * 10.0 },
                     LoopingAnimator::new(4, 0.2),
                     GravityScale(0.0),
@@ -192,13 +201,16 @@ fn use_ability(ability: &mut Ability, origin: &Transform, rotation: Quat, mut co
                     LockedAxes::ROTATION_LOCKED,
                     Collider::ball(64.0),
                     Sensor,
-                    Velocity { linvel: Vec2::from_angle(angle) * ability.ability_data.speed, angvel: std::f32::consts::FRAC_PI_4 },
+                    Velocity { linvel: Vec2::from_angle(angle) * ability.ability_data.speed, angvel: 2.0 * std::f32::consts::PI },
+                    AbilityTag
                 ); 
                 ability_instance.transform.rotation = rotation;
-                commands.spawn((ability_instance, damage_over_time , slow, animator, grav, rb, constraints, coll, sensor, vel));
+                commands.spawn((ability_instance, damage_over_time , slow, animator, grav, rb, constraints, coll, sensor, vel, ability));
             },
             AbilityType::HealOrb => {
-                let (mut ability_instance , heal, grav, rb, constraints, coll, sensor, vel) = (
+                let (mut ability_instance, heal, grav, rb, 
+                         constraints, coll, sensor, vel, ability
+                ) = (
                     ability_sprite, 
                     Heal { heal_amount: ability.ability_data.magnitude }, 
                     GravityScale(0.0),
@@ -206,15 +218,77 @@ fn use_ability(ability: &mut Ability, origin: &Transform, rotation: Quat, mut co
                     LockedAxes::ROTATION_LOCKED,
                     Collider::ball(32.0),
                     Sensor,
-                    Velocity { linvel: Vec2::ZERO, angvel: 0.0 }
+                    Velocity { linvel: Vec2::ZERO, angvel: 0.0 },
+                    AbilityTag
                 );
                 ability_instance.transform.rotation = Quat::IDENTITY;
-                commands.spawn((ability_instance , heal, grav, rb, constraints, coll, sensor, vel));
+                commands.spawn((ability_instance , heal, grav, rb, constraints, coll, sensor, vel, ability));
             }
         };
     }
 }
 
+pub fn heal(
+    mut commands: Commands,
+    heal_query: Query<(&Heal, Entity), (With<AbilityTag>, With<Collider>)>,
+    mut player_query: Query<(&mut Health, Entity), (With<Player>, With<Collider>)>,
+    rapier: Res<RapierContext>
+) {
+    let (mut player_health, player_entity) = player_query.single_mut();
+    for (heal, heal_entity) in heal_query.iter() {
+        if rapier.intersection_pair(player_entity, heal_entity).is_some() {
+            player_health.heal(heal.heal_amount);
+            println!("Healed player for {}", heal.heal_amount);
+            commands.entity(heal_entity).despawn_recursive();
+        }
+    }
+}
+
+pub fn player_damage(
+    mut commands: Commands,
+    mut health_query: Query<(&mut Health, Entity), (With<Collider>, Without<Player>)>,
+    damage_query: Query<(&Damage, Entity), (With<AbilityTag>, With<Collider>)>,
+    rapier: Res<RapierContext>
+) {
+    for (mut enemy_health, entity) in health_query.iter_mut() {
+        for (damage, damage_entity) in damage_query.iter() {
+            if rapier.intersection_pair(entity, damage_entity).is_some() {
+                enemy_health.damage(damage.damage_amount, damage.damage_type);
+                println!("Damaged entity: {}", entity.index());
+                commands.entity(entity).despawn_recursive();
+                break;
+            }
+        }
+    }
+}
+
+pub fn player_dot(
+    mut health_query: Query<(&mut Health, Entity), (With<Collider>, Without<Player>)>,
+    damage_query: Query<(&DamageOverTime, Entity), (With<AbilityTag>, With<Collider>)>,
+    rapier: Res<RapierContext>
+) {
+    for (mut enemy_health, enemy_entity) in health_query.iter_mut() {
+        for (dot, damage_entity) in damage_query.iter() {
+            if rapier.intersection_pair(enemy_entity, damage_entity).is_some() {
+                enemy_health.add_dot(dot.tick_damage, dot.duration, dot.damage_type, damage_entity.index());
+            }
+        }
+    }
+}
+
+pub fn player_slow(
+    mut stat_query: Query<(&mut Stats, Entity), (With<Collider>, Without<Player>)>,
+    slow_query: Query<(&Slow, Entity), (With<AbilityTag>, With<Collider>)>,
+    rapier: Res<RapierContext>
+) {
+    for (mut enemy_stats, enemy_entity) in stat_query.iter_mut() {
+        for (slow, slow_entity) in slow_query.iter() {
+            if rapier.intersection_pair(enemy_entity, slow_entity).is_some() {
+                enemy_stats.apply_duration_change(slow.speed_reduction, slow.duration, slow_entity.index());
+            }
+        }
+    }
+}
 
 impl Default for AbilitySystem {
     fn default() -> Self {
@@ -240,15 +314,21 @@ pub struct Slow {
 
 #[derive(Component)]
 pub struct Damage {
-    pub damage_amount: f32
+    pub damage_amount: f32,
+    pub damage_type: DamageType
 }
 
 #[derive(Component)]
 pub struct DamageOverTime {
-    pub tick_damage: f32
+    pub tick_damage: f32,
+    pub damage_type: DamageType,
+    pub duration: f32
 }
 
 #[derive(Component)]
 pub struct Stun {
     pub stun_duration: f32
 }
+
+#[derive(Component)]
+pub struct AbilityTag;
