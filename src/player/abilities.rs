@@ -4,6 +4,8 @@ use bevy_inspector_egui::prelude::*;
 use bevy::utils::hashbrown::HashMap;
 use bevy::window::PrimaryWindow;
 
+use bevy_rapier2d::prelude::*;
+
 use bevy::reflect::*;
 
 use crate::input::Mouse;
@@ -124,10 +126,17 @@ fn use_ability(ability: &mut Ability, pos: Vec3, rotation: Quat, mut commands: C
     ability.cooldown_timer.set_duration(Duration::from_secs_f32(ability.ability_data.cooldown));
     ability.cooldown_timer.reset();
     if let Some(mut ability_sprite) = ability_sprites.sprites.get_mut(&ability.ability_data.id).cloned() {
+        let angle: f32 = rotation.xyz().z;
         ability_sprite.transform.translation = pos;
         match ability.ability_data.effect_type {
             EffectType::Slow => {
-                let (mut ability_instance , slow, animator) = (ability_sprite, Slow { speed_reduction: ability.ability_data.magnitude }, LoopingAnimator::new(4, 0.2)); 
+                let (mut ability_instance , slow, animator, rb, vel) = (
+                    ability_sprite, 
+                    Slow { speed_reduction: ability.ability_data.magnitude }, 
+                    LoopingAnimator::new(4, 0.2),
+                    RigidBody::Dynamic,
+                    Velocity { linvel: Vec2::from_angle(angle), angvel: 0.0 }
+                ); 
                 ability_instance.transform.rotation = rotation;
                 commands.spawn((ability_instance, slow, animator));
             },
