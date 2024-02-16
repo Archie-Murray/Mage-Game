@@ -276,7 +276,6 @@ pub fn player_dot(
         }
     }
 }
-<<<<<<< HEAD
 
 pub fn player_slow(
     mut stat_query: Query<(&mut Stats, Entity), (With<Collider>, Without<Player>)>,
@@ -291,8 +290,6 @@ pub fn player_slow(
         }
     }
 }
-=======
->>>>>>> 30937a278701ec1fc2d9060768336ffe07705ecb
 
 impl Default for AbilitySystem {
     fn default() -> Self {
