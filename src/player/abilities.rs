@@ -169,12 +169,10 @@ fn use_ability(ability: &mut Ability, origin: &Transform, rotation: Quat, mut co
     ability.cooldown_timer.set_duration(Duration::from_secs_f32(ability.ability_data.cooldown));
     ability.cooldown_timer.reset();
     if let Some(mut ability_sprite) = ability_sprites.sprites.get_mut(&ability.ability_data.id).cloned() {
+        println!("Spawning ability: {:?}", ability.ability_data.id);
         let (_, _, angle) = rotation.to_euler(EulerRot::XYZ);
-        if ability.ability_data.id != AbilityType::HealOrb {
-            ability_sprite.transform.translation = origin.translation + rotation.mul_vec3(Vec3::new(1.0, 0.0, 0.0)) * 64.0;
-        } else {
-            ability_sprite.transform.translation = origin.translation;
-        }
+        ability_sprite.transform.translation = origin.translation + rotation.mul_vec3(Vec3::new(1.0, 0.0, 0.0)) * 64.0;
+        ability_sprite.transform.translation = origin.translation;
         match ability.ability_data.id {
             AbilityType::FireBall => {
                 let (mut ability_instance , damage, animator, 
@@ -222,7 +220,7 @@ fn use_ability(ability: &mut Ability, origin: &Transform, rotation: Quat, mut co
                     GravityScale(0.0),
                     RigidBody::Dynamic,
                     LockedAxes::ROTATION_LOCKED,
-                    Collider::ball(32.0),
+                    Collider::ball(4.0),
                     Sensor,
                     Velocity { linvel: Vec2::ZERO, angvel: 0.0 },
                     AbilityTag
