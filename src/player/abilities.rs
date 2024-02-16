@@ -94,7 +94,7 @@ impl Plugin for AbilitySystemPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<AbilityBundle>();
         app.add_systems(Startup, init_abilites);
-        app.add_systems(Update, (update_abilities, cast_ability, heal, player_dot, player_damage));
+        app.add_systems(Update, (update_abilities, cast_ability, player_heal, player_dot, player_damage, player_slow));
     }
 }
 
@@ -234,7 +234,7 @@ fn use_ability(ability: &mut Ability, origin: &Transform, rotation: Quat, mut co
     }
 }
 
-pub fn heal(
+pub fn player_heal(
     mut commands: Commands,
     heal_query: Query<(&Heal, Entity), (With<AbilityTag>, With<Collider>)>,
     mut player_query: Query<(&mut Health, Entity), (With<Player>, With<Collider>)>,
@@ -256,12 +256,12 @@ pub fn player_damage(
     damage_query: Query<(&Damage, Entity), (With<AbilityTag>, With<Collider>)>,
     rapier: Res<RapierContext>
 ) {
-    for (mut enemy_health, entity) in health_query.iter_mut() {
+    for (mut enemy_health, enemy_entity) in health_query.iter_mut() {
         for (damage, damage_entity) in damage_query.iter() {
-            if rapier.intersection_pair(entity, damage_entity).is_some() {
+            if rapier.intersection_pair(enemy_entity, damage_entity).is_some() {
                 enemy_health.damage(damage.damage_amount, damage.damage_type);
-                println!("Damaged entity: {}", entity.index());
-                commands.entity(entity).despawn_recursive();
+                println!("Damaged entity: {}", enemy_entity.index());
+                commands.entity(enemy_entity).despawn_recursive();
                 break;
             }
         }
