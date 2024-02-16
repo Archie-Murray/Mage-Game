@@ -5,6 +5,7 @@ use bevy::utils::hashbrown::HashMap;
 
 use bevy_rapier2d::prelude::*;
 
+use crate::entity::stat_type::StatType;
 use crate::input::Mouse;
 
 use crate::animation::looping_animator::LoopingAnimator;
@@ -169,7 +170,11 @@ fn use_ability(ability: &mut Ability, origin: &Transform, rotation: Quat, mut co
     ability.cooldown_timer.reset();
     if let Some(mut ability_sprite) = ability_sprites.sprites.get_mut(&ability.ability_data.id).cloned() {
         let (_, _, angle) = rotation.to_euler(EulerRot::XYZ);
-        ability_sprite.transform.translation = origin.translation + rotation.mul_vec3(Vec3::new(1.0, 0.0, 0.0)) * 64.0;
+        if ability.ability_data.id != AbilityType::HealOrb {
+            ability_sprite.transform.translation = origin.translation + rotation.mul_vec3(Vec3::new(1.0, 0.0, 0.0)) * 64.0;
+        } else {
+            ability_sprite.transform.translation = origin.translation;
+        }
         match ability.ability_data.id {
             AbilityType::FireBall => {
                 let (mut ability_instance , damage, animator, 
@@ -195,7 +200,7 @@ fn use_ability(ability: &mut Ability, origin: &Transform, rotation: Quat, mut co
                 ) = (
                     ability_sprite, 
                     DamageOverTime { tick_damage: ability.ability_data.magnitude, damage_type: DamageType::PHYSICAL, duration: 0.5 }, 
-                    Slow { speed_reduction: ability.ability_data.magnitude * 10.0 },
+                    Slow { speed_reduction: ability.ability_data.magnitude * 10.0, duration: ability.ability_data.magnitude },
                     LoopingAnimator::new(4, 0.2),
                     GravityScale(0.0),
                     RigidBody::KinematicVelocityBased,
@@ -285,7 +290,7 @@ pub fn player_slow(
     for (mut enemy_stats, enemy_entity) in stat_query.iter_mut() {
         for (slow, slow_entity) in slow_query.iter() {
             if rapier.intersection_pair(enemy_entity, slow_entity).is_some() {
-                enemy_stats.apply_duration_change(slow.speed_reduction, slow.duration, slow_entity.index());
+                enemy_stats.add_duration_change(StatType::Speed, slow.speed_reduction, slow.duration, slow_entity.index());
             }
         }
     }
@@ -310,7 +315,8 @@ pub struct Heal {
 
 #[derive(Component)]
 pub struct Slow {
-    pub speed_reduction: f32
+    pub speed_reduction: f32,
+    pub duration: f32
 }
 
 #[derive(Component)]
