@@ -2,10 +2,12 @@ use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy::winit::WinitWindows;
+use bevy_hanabi::prelude::*;
 use winit::window::Icon;
 mod player;
 mod damage;
 mod animation;
+mod abilities;
 mod entity;
 mod input;
 
@@ -29,15 +31,18 @@ fn main() {
             ),
         )
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(1.0))
+        .add_plugins(HanabiPlugin)
         .add_plugins(RapierDebugRenderPlugin::default())
+        .add_plugins(abilities::ability_particles::ParticlePlugin)
         .add_plugins(entity::EntityPlugin)
         .add_plugins(GamePlugin)
         .add_plugins(input::InputPlugin)
         .add_plugins(WorldInspectorPlugin::new())
-        .register_type::<player::abilities::AbilitySystem>()
+        .register_type::<abilities::abilities::AbilitySystem>()
+        .register_type::<abilities::abilities::AutoDestroy>()
         .add_plugins(damage::health::HealthPlugin)
         .add_plugins(player::playerplugin::PlayerPlugin)
-        .add_plugins(player::abilities::AbilitySystemPlugin)
+        .add_plugins(abilities::abilities::AbilitySystemPlugin)
         .add_plugins(animation::AnimatorPlugin)
         .run();
 }
@@ -47,6 +52,7 @@ struct GamePlugin;
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, (spawn_camera, set_icon));
+        app.add_systems(Update, toggle_rapier_debug);
     }
 }
 
@@ -70,4 +76,12 @@ fn set_icon(windows: NonSend<WinitWindows>) {
     }
 }
 
-
+pub fn toggle_rapier_debug(
+    input: Res<Input<KeyCode>>,
+    mut render_context: ResMut<DebugRenderContext>
+) {
+    if input.just_pressed(KeyCode::Escape) {
+        println!("Toggled render context");
+        render_context.enabled = !render_context.enabled;
+    }
+}

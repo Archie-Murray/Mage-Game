@@ -4,4 +4,3 @@ use bevy::prelude::*;
 pub struct Player;
 
 pub mod playerplugin;
-pub mod abilities;
