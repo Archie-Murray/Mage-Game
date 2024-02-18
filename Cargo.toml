@@ -13,6 +13,9 @@ bevy_hanabi = { version = "0.9", default-features = false, features = [ "2d" ] }
 winit = "0.28"
 image = "0.24.8"
 bevy_aseprite = "0.12.0"
+tiled = "0.11.2"
+thiserror = "1.0.57"
+bevy_tiled_blueprints = { git = "https://github.com/Leinnan/bevy_tiled_blueprints", version = "0.1.0" }
 
 [workspace]
 resolver = "2"

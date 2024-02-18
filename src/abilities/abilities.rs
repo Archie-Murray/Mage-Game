@@ -109,19 +109,19 @@ fn init_abilites(
         (AbilityType::FireBall, SpriteSheetBundle { 
             texture_atlas: texture_atlases.add(TextureAtlas::from_grid(asset_server.load("abilities/fire_ball.png"), Vec2::splat(32.0), 5, 1, None, None)),
             sprite: TextureAtlasSprite::new(0), 
-            transform: Transform::from_scale(Vec3::splat(1.0)), 
+            transform: Transform::from_xyz(0.0, 0.0, 1.0),
             .. default()
         }),
         (AbilityType::IceStorm, SpriteSheetBundle { 
             texture_atlas: texture_atlases.add(TextureAtlas::from_grid(asset_server.load("abilities/ice_storm.png"), Vec2::splat(64.0), 1, 1, None, None)),
             sprite: TextureAtlasSprite::new(0), 
-            transform: Transform::from_scale(Vec3::splat(1.0)),
+            transform: Transform::from_xyz(0.0, 0.0, 1.0),
             .. default()
         }),        
         (AbilityType::HealOrb, SpriteSheetBundle { 
             texture_atlas: texture_atlases.add(TextureAtlas::from_grid(asset_server.load("abilities/heal_orb.png"), Vec2::splat(32.0), 5, 1, None, None)),
             sprite: TextureAtlasSprite::new(0), 
-            transform: Transform::from_scale(Vec3::splat(1.0)),
+            transform: Transform::from_xyz(0.0, 0.0, 1.0),
             .. default()
         }) 
     ]);
@@ -177,7 +177,6 @@ fn use_ability(ability: &mut Ability, origin: &Transform, rotation: Quat, mut co
         println!("Spawning ability: {:?}", ability.ability_data.ability_type);
         let (_, _, angle) = rotation.to_euler(EulerRot::XYZ);
         ability_sprite.transform.translation = origin.translation + rotation.mul_vec3(Vec3::new(1.0, 0.0, 0.0)) * 64.0;
-        ability_sprite.transform.translation = origin.translation;
         match ability.ability_data.ability_type {
             AbilityType::FireBall => {
                 let (mut ability_instance , damage, animator, 
@@ -196,7 +195,8 @@ fn use_ability(ability: &mut Ability, origin: &Transform, rotation: Quat, mut co
                     AutoDestroy::new(2.0)
                 ); 
                 ability_instance.transform.rotation = rotation;
-                commands.spawn((ability_instance , damage, animator, grav, rb, constraints, coll, sensor, vel, ability, auto_destroy));
+                let particles = commands.spawn(ParticleEffectBundle { effect: ParticleEffect::new(ability_particles.particle_effects.get(&ParticleType::FireBall).unwrap().clone()), transform: Transform::from_xyz(0.0, 0.0, 1.0), ..Default::default() }).id();
+                commands.spawn((ability_instance , damage, animator, grav, rb, constraints, coll, sensor, vel, ability, auto_destroy)).add_child(particles);
             },
             AbilityType::IceStorm => {
                 let (mut ability_instance, damage_over_time , slow, 
@@ -217,7 +217,7 @@ fn use_ability(ability: &mut Ability, origin: &Transform, rotation: Quat, mut co
                 ability_instance.transform.rotation = rotation;
                 let ability_bundle = (ability_instance, damage_over_time , slow, grav, rb, constraints, coll, sensor, vel, ability, auto_destroy);
                 if let Some(particle_effect) = ability_particles.particle_effects.get(&ParticleType::IceStorm) {
-                    let particles = commands.spawn(ParticleEffectBundle { effect: ParticleEffect::new(particle_effect.clone()), transform: Transform::from_scale(Vec3::splat(10.0)), ..Default::default() }).id();
+                    let particles = commands.spawn(ParticleEffectBundle { effect: ParticleEffect::new(particle_effect.clone()), transform: Transform::from_xyz(0.0, 0.0, 1.0), ..Default::default() }).id();
                     commands.spawn(ability_bundle).add_child(particles);
                 } else {
                     commands.spawn(ability_bundle);
@@ -239,7 +239,8 @@ fn use_ability(ability: &mut Ability, origin: &Transform, rotation: Quat, mut co
                     AutoDestroy::new(10.0)
                 );
                 ability_instance.transform.rotation = Quat::IDENTITY;
-                commands.spawn((ability_instance , heal, grav, rb, constraints, coll, sensor, vel, ability, auto_destroy));
+                let particles = commands.spawn(ParticleEffectBundle { effect: ParticleEffect::new(ability_particles.particle_effects.get(&ParticleType::HealOrb).unwrap().clone()), transform: Transform::from_xyz(0.0, 0.0, 1.0), ..default() }).id();
+                commands.spawn((ability_instance , heal, grav, rb, constraints, coll, sensor, vel, ability, auto_destroy)).add_child(particles);
             }
         };
     }
@@ -368,25 +369,28 @@ impl AutoDestroy {
 fn auto_destroy_abilities(
     time: Res<Time>,
     mut commands: Commands, 
-    mut query: Query<(&mut AutoDestroy, &AbilityTag, &Transform, Entity)>,
+    mut query: Query<(&mut AutoDestroy, &AbilityTag, &Transform, Entity), With<AbilityTag>>,
     particles: Res<AbilityParticle>
 ) {
-    let mut to_destroy: Vec<(Entity, AbilityType, &Transform)> = Vec::new();
+    let mut to_destroy: Vec<(Entity, AbilityType, &Vec3)> = Vec::new();
     for (mut auto_destroy, ability, transform, entity) in query.iter_mut() {
         auto_destroy.remaining = (auto_destroy.remaining - time.delta_seconds()).max(0.0);
         if auto_destroy.remaining == 0.0 {
-            to_destroy.push((entity, ability.ability_type, transform));
+            to_destroy.push((entity, ability.ability_type, &transform.translation));
         }
     }
 
-    for (entity, ability_type, transform) in to_destroy {
-        let (pos, rot) = (transform.translation, transform.rotation);
+    for (entity, ability_type, pos) in to_destroy {
         match ability_type {
-            AbilityType::FireBall => println!("Not implemented"),
-            AbilityType::IceStorm => {
-                commands.spawn((AutoDestroy::new(0.5), ParticleEffectBundle { effect: ParticleEffect::new(particles.particle_effects.get(&ParticleType::IceStormFinish).unwrap().clone()), transform: transform.with_scale(Vec3::splat(10.0)), ..default()}));
+            AbilityType::FireBall => {
+                commands.spawn((AutoDestroy::new(0.125), ParticleEffectBundle { effect: ParticleEffect::new(particles.particle_effects.get(&ParticleType::FireBallDetonate).unwrap().clone()), transform: Transform::from_translation(*pos).with_scale(Vec3::splat(10.0)), ..default()}));
             },
-            AbilityType::HealOrb => println!("Not implemented")
+            AbilityType::IceStorm => {
+                commands.spawn((AutoDestroy::new(0.25), ParticleEffectBundle { effect: ParticleEffect::new(particles.particle_effects.get(&ParticleType::IceStormFinish).unwrap().clone()), transform: Transform::from_translation(*pos).with_scale(Vec3::splat(10.0)), ..default()}));
+            },
+            AbilityType::HealOrb =>  {
+                commands.spawn((AutoDestroy::new(0.125), ParticleEffectBundle { effect: ParticleEffect::new(particles.particle_effects.get(&ParticleType::HealOrbDetonate).unwrap().clone()), transform: Transform::from_translation(*pos).with_scale(Vec3::splat(10.0)), ..default()}));
+            }   
         }
         commands.entity(entity).despawn_recursive();
     }

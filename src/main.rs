@@ -4,6 +4,8 @@ use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy::winit::WinitWindows;
 use bevy_hanabi::prelude::*;
 use winit::window::Icon;
+use bevy_ecs_tilemap::prelude::*;
+use bevy_tiled_blueprints::prelude::*;
 mod player;
 mod damage;
 mod animation;
@@ -35,6 +37,9 @@ fn main() {
         .add_plugins(RapierDebugRenderPlugin::default())
         .add_plugins(abilities::ability_particles::ParticlePlugin)
         .add_plugins(entity::EntityPlugin)
+        .add_plugins(TilemapPlugin)
+        .add_plugins(TiledBlueprintsPlugin)
+        // .add_plugins(bevy_tiled_blueprints::prelude::TiledBlueprintsDebugDisplayPlugin)
         .add_plugins(GamePlugin)
         .add_plugins(input::InputPlugin)
         .add_plugins(WorldInspectorPlugin::new())
@@ -51,13 +56,23 @@ struct GamePlugin;
 
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, (spawn_camera, set_icon));
+        app.add_systems(Startup, (spawn_camera, set_icon, spawn_tilemap.before(player::playerplugin::spawn_player)));
         app.add_systems(Update, toggle_rapier_debug);
     }
 }
 
 #[derive(Component)]
 pub struct MainCamera;
+
+fn spawn_tilemap(mut commands: Commands, asset_server: Res<AssetServer>) {
+    let map_handle: Handle<TiledMap> = asset_server.load("main.tmx");
+
+    commands.spawn(TiledMapBundle {
+        tiled_map: map_handle,
+        transform: Transform::from_xyz(0.0, 0.0, -10.0),
+        ..Default::default()
+    });
+}
 
 fn spawn_camera(mut commands: Commands) {
     let camera: Camera2dBundle = Camera2dBundle { ..default() };
