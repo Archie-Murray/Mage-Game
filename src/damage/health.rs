@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use crate::damage::damagetype::DamageType;
 use crate::damage;
 use bevy::utils::hashbrown::HashMap;
+use bevy_inspector_egui::prelude::*;
 
 pub struct HealthPlugin;
 
@@ -10,11 +11,13 @@ impl Plugin for HealthPlugin {
         app
             .add_event::<HealthDamageEvent>()
             .add_event::<HealthDeathEvent>()
+            .register_type::<Health>()
             .add_systems(Update, health_update);
     }
 }
 
-#[derive(Component)]
+#[derive(Component, Reflect, InspectorOptions)]
+#[reflect(InspectorOptions)]
 pub struct Health {
     current_health: f32,
     max_health: f32,
@@ -24,10 +27,11 @@ pub struct Health {
     is_invulnerable: bool,
     damage_timer: DamageTimer,
     entity_type: EntityType,
+    #[reflect(ignore)]
     dots: HashMap<u32, DOT>
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Reflect, Copy)]
 pub struct DOT {
     pub tick_damage: f32, 
     pub duration: f32, 
@@ -35,11 +39,13 @@ pub struct DOT {
     pub finished: bool
 }
 
+#[derive(Reflect)]
 pub struct DamageTimer {
     pub timer: Timer,
     pub amount: f32
 }
 
+#[derive(Reflect)]
 pub enum EntityType { Player, Enemy, Boss }
 
 impl Clone for EntityType {

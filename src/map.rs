@@ -1,6 +1,7 @@
 use bevy::{prelude::*, utils::hashbrown::{HashMap, HashSet}};
 use bevy_ecs_ldtk::prelude::*;
 use bevy_rapier2d::prelude::*;
+use crate::damage::{damagetype::DamageType, health::Health};
 
 #[derive(Clone, Debug, Default, Bundle, LdtkIntCell)]
 pub struct VoidBundle {
@@ -17,6 +18,25 @@ pub struct Wall;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Default, Component)]
 pub struct Void;
+
+#[derive(Component)]
+pub struct VoidCollider;
+
+pub fn void_collisions(
+    time: Res<Time>,
+    mut health_query: Query<(Entity, &mut Health), Without<Void>>,
+    void_query: Query<Entity, (With<VoidCollider>, With<Collider>)>,
+    rapier: Res<RapierContext>
+) {
+    for (health_entity, mut health) in health_query.iter_mut() {
+        for void_entity in void_query.iter() {
+            if (rapier.intersection_pair(health_entity, void_entity)).is_some() {
+                println!("Enitity: {} is in the void!", health_entity.index());
+                health.damage(100.0 * time.delta_seconds(), DamageType::BYPASS);
+            }
+        }
+    }
+}
 
 /// 4. spawn colliders for each rectangle
 pub fn spawn_void_collision(
@@ -158,6 +178,7 @@ pub fn spawn_void_collision(
                             .insert(RigidBody::Fixed)
                             .insert(Friction::new(1.0))
                             .insert(Sensor::default())
+                            .insert(VoidCollider)
                             .insert(Transform::from_xyz(
                                 (wall_rect.left + wall_rect.right + 1) as f32 * grid_size as f32
                                     / 2.,

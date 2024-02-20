@@ -59,7 +59,7 @@ struct GamePlugin;
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, (spawn_camera, set_icon, spawn_tilemap.before(player::playerplugin::spawn_player)));
-        app.add_systems(Update, (toggle_rapier_debug, map::spawn_wall_collision, map::spawn_void_collision));
+        app.add_systems(Update, (toggle_rapier_debug, map::spawn_wall_collision, map::spawn_void_collision, map::void_collisions));
         app.add_systems(Update, camera_follow.after(player::playerplugin::player_move_input));
     }
 }
