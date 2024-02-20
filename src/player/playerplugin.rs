@@ -66,7 +66,7 @@ pub fn spawn_player(
         SpriteSheetBundle {
             texture_atlas: texture_atlases.add(texture_atlas),
             sprite: TextureAtlasSprite::new(0),
-            transform: Transform::from_xyz(0.0, 0.0, 1.0),
+            transform: Transform::from_xyz(50.0, 0.0, 1.0),
             ..default()
         },
         AnimationTimer {

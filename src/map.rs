@@ -18,14 +18,6 @@ pub struct Wall;
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Default, Component)]
 pub struct Void;
 
-pub fn create_map_colliders(
-    int_grid: Query<(&IntGridCell, &Transform, Entity), Added<IntGridCell>>,
-    mut commands: Commands
-) {
-    for (grid_cell, transform, entity) in int_grid.iter() {
-        commands.entity(entity).insert((Collider::cuboid(16.0, 16.0), Transform::clone(transform)));
-    }
-}
 /// 4. spawn colliders for each rectangle
 pub fn spawn_void_collision(
     mut commands: Commands,
@@ -165,6 +157,7 @@ pub fn spawn_void_collision(
                             ))
                             .insert(RigidBody::Fixed)
                             .insert(Friction::new(1.0))
+                            .insert(Sensor::default())
                             .insert(Transform::from_xyz(
                                 (wall_rect.left + wall_rect.right + 1) as f32 * grid_size as f32
                                     / 2.,

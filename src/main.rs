@@ -35,14 +35,13 @@ fn main() {
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(1.0))
         .insert_resource(RapierConfiguration { gravity: Vec2::ZERO, ..default() })
         .add_plugins(HanabiPlugin)
-        .add_plugins(RapierDebugRenderPlugin::default())
+        .add_plugins(RapierDebugRenderPlugin { enabled: false, ..Default::default() })
         .add_plugins(LdtkPlugin)
         .register_ldtk_int_cell::<map::WallBundle>(1)
         .register_ldtk_int_cell::<map::VoidBundle>(2)
         .insert_resource(LevelSelection::index(0))
         .add_plugins(abilities::ability_particles::ParticlePlugin)
         .add_plugins(entity::EntityPlugin)
-        // .add_plugins(bevy_tiled_blueprints::prelude::TiledBlueprintsDebugDisplayPlugin)
         .add_plugins(GamePlugin)
         .add_plugins(input::InputPlugin)
         .add_plugins(WorldInspectorPlugin::new())
@@ -61,7 +60,20 @@ impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, (spawn_camera, set_icon, spawn_tilemap.before(player::playerplugin::spawn_player)));
         app.add_systems(Update, (toggle_rapier_debug, map::spawn_wall_collision, map::spawn_void_collision));
+        app.add_systems(Update, camera_follow.after(player::playerplugin::player_move_input));
     }
+}
+
+fn camera_follow(
+    time: Res<Time>,
+    mut camera_query: Query<&mut Transform, (With<MainCamera>, Without<player::Player>)>,
+    player_query: Query<&Transform, (With<player::Player>, Without<MainCamera>)>
+) {
+    let Ok(mut camera) = camera_query.get_single_mut() else {return;};
+    let Ok(player) = player_query.get_single() else {return;};
+    if (player.translation.truncate() - camera.translation.truncate()).length_squared() < 100.0 { return; }
+    let lerp = camera.translation.truncate().lerp(player.translation.truncate(), time.delta_seconds());
+    camera.translation = lerp.extend(camera.translation.z);
 }
 
 #[derive(Component)]
@@ -77,7 +89,7 @@ fn spawn_tilemap(mut commands: Commands, asset_server: Res<AssetServer>) {
 }
 
 fn spawn_camera(mut commands: Commands) {
-    let camera: Camera2dBundle = Camera2dBundle { ..default() };
+    let camera: Camera2dBundle = Camera2dBundle { projection: OrthographicProjection { scale: 1.0 / 3.0, near: -100.0, far: 100.0, ..default() }, ..default() };
     commands.spawn((camera, MainCamera));
 }
 
