@@ -1,6 +1,6 @@
 [package]
 name = "mage-game"
-version = "0.6.0"
+version = "0.7.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -15,7 +15,7 @@ image = "0.24.8"
 bevy_aseprite = "0.12.0"
 tiled = "0.11.2"
 thiserror = "1.0.57"
-bevy_tiled_blueprints = { git = "https://github.com/Leinnan/bevy_tiled_blueprints", version = "0.1.0" }
+bevy_ecs_ldtk = "0.9.0"
 
 [workspace]
 resolver = "2"

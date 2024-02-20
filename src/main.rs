@@ -4,14 +4,14 @@ use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy::winit::WinitWindows;
 use bevy_hanabi::prelude::*;
 use winit::window::Icon;
-use bevy_ecs_tilemap::prelude::*;
-use bevy_tiled_blueprints::prelude::*;
+use bevy_ecs_ldtk::prelude::*;
 mod player;
 mod damage;
 mod animation;
 mod abilities;
 mod entity;
 mod input;
+mod map;
 
 fn main() {
     App::new()
@@ -33,12 +33,15 @@ fn main() {
             ),
         )
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(1.0))
+        .insert_resource(RapierConfiguration { gravity: Vec2::ZERO, ..default() })
         .add_plugins(HanabiPlugin)
         .add_plugins(RapierDebugRenderPlugin::default())
+        .add_plugins(LdtkPlugin)
+        .register_ldtk_int_cell::<map::WallBundle>(1)
+        .register_ldtk_int_cell::<map::VoidBundle>(2)
+        .insert_resource(LevelSelection::index(0))
         .add_plugins(abilities::ability_particles::ParticlePlugin)
         .add_plugins(entity::EntityPlugin)
-        .add_plugins(TilemapPlugin)
-        .add_plugins(TiledBlueprintsPlugin)
         // .add_plugins(bevy_tiled_blueprints::prelude::TiledBlueprintsDebugDisplayPlugin)
         .add_plugins(GamePlugin)
         .add_plugins(input::InputPlugin)
@@ -57,7 +60,7 @@ struct GamePlugin;
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, (spawn_camera, set_icon, spawn_tilemap.before(player::playerplugin::spawn_player)));
-        app.add_systems(Update, toggle_rapier_debug);
+        app.add_systems(Update, (toggle_rapier_debug, map::spawn_wall_collision, map::spawn_void_collision));
     }
 }
 
@@ -65,13 +68,12 @@ impl Plugin for GamePlugin {
 pub struct MainCamera;
 
 fn spawn_tilemap(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let map_handle: Handle<TiledMap> = asset_server.load("main.tmx");
-
-    commands.spawn(TiledMapBundle {
-        tiled_map: map_handle,
-        transform: Transform::from_xyz(0.0, 0.0, -10.0),
-        ..Default::default()
-    });
+    let map = LdtkWorldBundle {
+        ldtk_handle: asset_server.load("environment/main.ldtk"),
+        transform: Transform::from_xyz(-768.0, -768.0, -10.0),
+        ..default()
+    };
+    commands.spawn(map);
 }
 
 fn spawn_camera(mut commands: Commands) {
