@@ -31,7 +31,6 @@ pub fn void_collisions(
     for (health_entity, mut health) in health_query.iter_mut() {
         for void_entity in void_query.iter() {
             if (rapier.intersection_pair(health_entity, void_entity)).is_some() {
-                println!("Enitity: {} is in the void!", health_entity.index());
                 health.damage(100.0 * time.delta_seconds(), DamageType::BYPASS);
             }
         }

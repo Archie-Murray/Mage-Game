@@ -74,7 +74,6 @@ pub fn spawn_player(
             is_animating: true,
         },
         RigidBody::Dynamic,
-        GravityScale(0.0),
         LockedAxes::ROTATION_LOCKED,
         Velocity {
             linvel: Vec2::ZERO,

@@ -180,12 +180,11 @@ fn use_ability(ability: &mut Ability, origin: &Transform, rotation: Quat, mut co
         match ability.ability_data.ability_type {
             AbilityType::FireBall => {
                 let (mut ability_instance , damage, animator, 
-                         grav, rb, constraints, coll, sensor , vel, ability, auto_destroy
+                         rb, constraints, coll, sensor , vel, ability, auto_destroy
                 ) = (
                     ability_sprite, 
                     Damage { damage_amount: ability.ability_data.magnitude, damage_type: DamageType::MAGICAL }, 
                     LoopingAnimator::new(4, 0.2),
-                    GravityScale(0.0),
                     RigidBody::Dynamic,
                     LockedAxes::ROTATION_LOCKED,
                     Collider::ball(32.0),
@@ -196,16 +195,15 @@ fn use_ability(ability: &mut Ability, origin: &Transform, rotation: Quat, mut co
                 ); 
                 ability_instance.transform.rotation = rotation;
                 let particles = commands.spawn(ParticleEffectBundle { effect: ParticleEffect::new(ability_particles.particle_effects.get(&ParticleType::FireBall).unwrap().clone()), transform: Transform::from_xyz(0.0, 0.0, 1.0), ..Default::default() }).id();
-                commands.spawn((ability_instance , damage, animator, grav, rb, constraints, coll, sensor, vel, ability, auto_destroy)).add_child(particles);
+                commands.spawn((ability_instance , damage, animator, rb, constraints, coll, sensor, vel, ability, auto_destroy)).add_child(particles);
             },
             AbilityType::IceStorm => {
                 let (mut ability_instance, damage_over_time , slow, 
-                         grav, rb, constraints, coll, sensor, vel, ability, auto_destroy
+                         rb, constraints, coll, sensor, vel, ability, auto_destroy
                 ) = (
                     ability_sprite, 
                     DamageOverTime { tick_damage: ability.ability_data.magnitude, damage_type: DamageType::PHYSICAL, duration: 0.5 }, 
                     Slow { speed_reduction: ability.ability_data.magnitude * 10.0, duration: ability.ability_data.magnitude },
-                    GravityScale(0.0),
                     RigidBody::KinematicVelocityBased,
                     LockedAxes::ROTATION_LOCKED,
                     Collider::ball(64.0),
@@ -215,7 +213,7 @@ fn use_ability(ability: &mut Ability, origin: &Transform, rotation: Quat, mut co
                     AutoDestroy::new(5.0)
                 ); 
                 ability_instance.transform.rotation = rotation;
-                let ability_bundle = (ability_instance, damage_over_time , slow, grav, rb, constraints, coll, sensor, vel, ability, auto_destroy);
+                let ability_bundle = (ability_instance, damage_over_time , slow, rb, constraints, coll, sensor, vel, ability, auto_destroy);
                 if let Some(particle_effect) = ability_particles.particle_effects.get(&ParticleType::IceStorm) {
                     let particles = commands.spawn(ParticleEffectBundle { effect: ParticleEffect::new(particle_effect.clone()), transform: Transform::from_xyz(0.0, 0.0, 1.0), ..Default::default() }).id();
                     commands.spawn(ability_bundle).add_child(particles);
@@ -224,12 +222,11 @@ fn use_ability(ability: &mut Ability, origin: &Transform, rotation: Quat, mut co
                 }
             },
             AbilityType::HealOrb => {
-                let (mut ability_instance, heal, grav, rb, 
+                let (mut ability_instance, heal, rb, 
                          constraints, coll, sensor, vel, ability, auto_destroy
                 ) = (
                     ability_sprite, 
                     Heal { heal_amount: ability.ability_data.magnitude }, 
-                    GravityScale(0.0),
                     RigidBody::Dynamic,
                     LockedAxes::ROTATION_LOCKED,
                     Collider::ball(4.0),
@@ -240,7 +237,7 @@ fn use_ability(ability: &mut Ability, origin: &Transform, rotation: Quat, mut co
                 );
                 ability_instance.transform.rotation = Quat::IDENTITY;
                 let particles = commands.spawn(ParticleEffectBundle { effect: ParticleEffect::new(ability_particles.particle_effects.get(&ParticleType::HealOrb).unwrap().clone()), transform: Transform::from_xyz(0.0, 0.0, 1.0), ..default() }).id();
-                commands.spawn((ability_instance , heal, grav, rb, constraints, coll, sensor, vel, ability, auto_destroy)).add_child(particles);
+                commands.spawn((ability_instance , heal, rb, constraints, coll, sensor, vel, ability, auto_destroy)).add_child(particles);
             }
         };
     }
