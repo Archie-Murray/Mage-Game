@@ -12,6 +12,7 @@ mod abilities;
 mod entity;
 mod input;
 mod map;
+mod pathfinding;
 
 fn main() {
     App::new()
