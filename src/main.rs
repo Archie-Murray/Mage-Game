@@ -1,9 +1,12 @@
+#![allow(clippy::needless_return)]
+
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy::winit::WinitWindows;
 use bevy_hanabi::prelude::*;
 use winit::window::Icon;
+use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
 use bevy_ecs_ldtk::prelude::*;
 mod player;
 mod damage;
@@ -13,6 +16,8 @@ mod entity;
 mod input;
 mod map;
 mod pathfinding;
+mod enemy;
+mod debug;
 
 fn main() {
     App::new()
@@ -27,6 +32,7 @@ fn main() {
                             title: "Mage Game".into(),
                             resolution: (1920.0, 1080.0).into(),
                             prevent_default_event_handling: false,
+                            present_mode: bevy::window::PresentMode::Immediate,
                             .. default()
                         }),
                         ..default()
@@ -43,15 +49,20 @@ fn main() {
         .insert_resource(LevelSelection::index(0))
         .add_plugins(abilities::ability_particles::ParticlePlugin)
         .add_plugins(entity::EntityPlugin)
+        .add_plugins(enemy::EnemyPlugin)
+        .add_plugins(pathfinding::PathfindingPlugin)
         .add_plugins(GamePlugin)
         .add_plugins(input::InputPlugin)
         .add_plugins(WorldInspectorPlugin::new())
         .register_type::<abilities::abilities::AbilitySystem>()
         .register_type::<abilities::abilities::AutoDestroy>()
+        .register_type::<animation::directional_animator::DirectionalAnimator>()
         .add_plugins(damage::health::HealthPlugin)
         .add_plugins(player::playerplugin::PlayerPlugin)
         .add_plugins(abilities::abilities::AbilitySystemPlugin)
         .add_plugins(animation::AnimatorPlugin)
+        .add_plugins(FrameTimeDiagnosticsPlugin::default())
+        .add_plugins(debug::FPSCounter)
         .run();
 }
 
@@ -60,7 +71,7 @@ struct GamePlugin;
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, (spawn_camera, set_icon, spawn_tilemap.before(player::playerplugin::spawn_player)));
-        app.add_systems(Update, (toggle_rapier_debug, map::spawn_wall_collision, map::spawn_void_collision, map::void_collisions));
+        app.add_systems(Update, (toggle_debug, map::spawn_wall_collision, map::spawn_void_collision, map::void_collisions));
         app.add_systems(Update, camera_follow.after(player::playerplugin::player_move_input));
     }
 }
@@ -106,12 +117,18 @@ fn set_icon(windows: NonSend<WinitWindows>) {
     }
 }
 
-pub fn toggle_rapier_debug(
+pub fn toggle_debug(
     input: Res<Input<KeyCode>>,
-    mut render_context: ResMut<DebugRenderContext>
+    mut render_context: ResMut<DebugRenderContext>,
+    mut fps_root: Query<&mut Visibility, With<debug::FpsRoot>>,
 ) {
     if input.just_pressed(KeyCode::Escape) {
         println!("Toggled render context");
         render_context.enabled = !render_context.enabled;
+        let mut fps_visibility = fps_root.single_mut();
+        *fps_visibility = match *fps_visibility {
+            Visibility::Hidden => Visibility::Visible,
+            _ => Visibility::Hidden
+        };
     }
 }

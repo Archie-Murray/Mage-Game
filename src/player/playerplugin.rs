@@ -12,7 +12,6 @@ use crate::abilities::abilities::AbilitySystem;
 use bevy::prelude::*;
 pub fn player_move_input(
     keyboard_input: Res<Input<KeyCode>>,
-    time: Res<Time>,
     mut query: Query<(&mut Velocity, &Stats), With<Player>>,
 ) {
     let input: Vec2 = Vec2::new(
@@ -23,7 +22,7 @@ pub fn player_move_input(
     );
     let (mut velocity, stats) = query.single_mut();
     velocity.linvel =
-        time.delta_seconds() * *stats.get_stat(StatType::Speed).unwrap_or(&50.0) * 100.0 * input;
+        *stats.get_stat(StatType::Speed).unwrap_or(&50.0) * input; //NOTE: Rapier already applies deltaTime multiplication
 }
 
 pub fn spawn_player(
@@ -42,36 +41,31 @@ pub fn spawn_player(
                 (
                     AnimationType::Idle,
                     HashMap::from([
-                        ( AnimationDirection::Up, AnimationIndices { first: 0, last: 0 },),
-                        ( AnimationDirection::Down, AnimationIndices { first: 6, last: 6 },),
-                        ( AnimationDirection::Left, AnimationIndices { first: 9, last: 9 },),
-                        ( AnimationDirection::Right, AnimationIndices { first: 3, last: 3 },),
+                        ( AnimationDirection::Up, AnimationIndices::new(0, 0 ),),
+                        ( AnimationDirection::Down, AnimationIndices::new(6, 6),),
+                        ( AnimationDirection::Left, AnimationIndices::new(9, 9),),
+                        ( AnimationDirection::Right, AnimationIndices::new(3, 3),),
                     ]),
                 ),
                 (
                     AnimationType::Walk,
                     HashMap::from([
-                        ( AnimationDirection::Up, AnimationIndices { first: 0, last: 2 },),
-                        ( AnimationDirection::Down, AnimationIndices { first: 6, last: 8 },),
-                        ( AnimationDirection::Left, AnimationIndices { first: 9, last: 11 },),
-                        ( AnimationDirection::Right, AnimationIndices { first: 3, last: 5 },),
+                        ( AnimationDirection::Up, AnimationIndices::new(0, 2),),
+                        ( AnimationDirection::Down, AnimationIndices::new(6, 8),),
+                        ( AnimationDirection::Left, AnimationIndices::new(9, 11),),
+                        ( AnimationDirection::Right, AnimationIndices::new(3, 5),),
                     ]),
                 ),
             ]),
-            current: AnimationType::Idle,
-            previous: AnimationType::Idle,
-            current_dir: AnimationDirection::Up,
-            previous_dir: AnimationDirection::Up,
+            animation: AnimationType::Idle,
+            direction: AnimationDirection::Up,
+            last_update_timer: 0.0
         },
         SpriteSheetBundle {
             texture_atlas: texture_atlases.add(texture_atlas),
             sprite: TextureAtlasSprite::new(0),
             transform: Transform::from_xyz(50.0, 0.0, 1.0),
             ..default()
-        },
-        AnimationTimer {
-            timer: Timer::from_seconds(0.1, TimerMode::Repeating),
-            is_animating: true,
         },
         RigidBody::Dynamic,
         LockedAxes::ROTATION_LOCKED,
@@ -86,40 +80,22 @@ pub fn spawn_player(
 }
 
 pub fn animate_player(
-    time: Res<Time>,
-    mut player_query: Query<
-        (
-            &mut DirectionalAnimator,
-            &Velocity,
-            &mut AnimationTimer,
-            &mut TextureAtlasSprite,
-        ),
-        With<Player>,
-    >,
+    input: Res<Input<KeyCode>>,
+    mut player_query: Query<&mut DirectionalAnimator, With<Player>>,
 ) {
-    let (mut animation, velocity, mut anim_timer, mut sprite) = player_query.single_mut();
-    if !anim_timer.is_animating {
-        return;
+    let player_input = Vec2::new(
+        (if input.get_pressed().find(|key_press| **key_press == KeyCode::D).is_some() { 1.0 } else { 0.0 }) - (if input.get_pressed().find(|key_press| **key_press == KeyCode::A).is_some() { 1.0 } else { 0.0 }),
+        (if input.get_pressed().find(|key_press| **key_press == KeyCode::W).is_some() { 1.0 } else { 0.0 }) - (if input.get_pressed().find(|key_press| **key_press == KeyCode::S).is_some() { 1.0 } else { 0.0 })
+    );
+    let Ok(mut player_animator) = player_query.get_single_mut() else { return; };
+    if player_input.length_squared() <= 0.01 {
+        player_animator.update_animation(AnimationType::Idle);
     } else {
-        // Update current animation:
-        if velocity.linvel.length_squared() <= 0.01 {
-            animation.update_animation(AnimationType::Idle);
-        } else {
-            animation.update_animation(AnimationType::Walk);
-            let vel_dir = vec2_to_direction(&velocity.linvel);
-            if vel_dir != animation.current_dir {
-                animation.update_direction(vel_dir);
-            }
+        player_animator.update_animation(AnimationType::Walk);
+        let vel_dir: AnimationDirection = vec2_to_direction(&player_input);
+        if vel_dir != player_animator.direction {
+            player_animator.update_direction(vel_dir);
         }
-    }
-    anim_timer.timer.tick(time.delta());
-    if anim_timer.timer.just_finished() {
-        let indices = animation.get_animation();
-        sprite.index = if sprite.index == indices.last {
-            indices.first
-        } else {
-            (sprite.index + 1).min(indices.last)
-        };
     }
 }
 

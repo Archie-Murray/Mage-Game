@@ -30,6 +30,20 @@ impl Stats {
         self.stat_effects.insert(id, StatChangeDuration { stat_type, amount, duration });
         self.add_stat(stat_type, -amount);
     }
+
+    pub fn new(health: f32, defence: f32, mag_def: f32, speed: f32, attack: f32, magic: f32) -> Self {
+        return Stats {
+            stats: HashMap::from([
+                (StatType::Health, health),
+                (StatType::Defence, defence),
+                (StatType::MagicDefence, mag_def),
+                (StatType::Speed, speed),
+                (StatType::Attack, attack),
+                (StatType::Magic, magic),
+            ]),
+            stat_effects: HashMap::new()
+        }
+    }
 }
 
 pub fn update_stats(time: Res<Time>, mut stats: Query<&mut Stats>) {
