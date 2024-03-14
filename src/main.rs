@@ -32,7 +32,7 @@ fn main() {
                             title: "Mage Game".into(),
                             resolution: (1920.0, 1080.0).into(),
                             prevent_default_event_handling: false,
-                            present_mode: bevy::window::PresentMode::Immediate,
+                            present_mode: bevy::window::PresentMode::AutoVsync,
                             .. default()
                         }),
                         ..default()
