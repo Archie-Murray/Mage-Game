@@ -13,8 +13,14 @@ struct FpsText;
 
 pub struct FPSCounter;
 
+#[derive(Resource)]
+pub struct Debug {
+    pub show_debug: bool
+}
+
 impl Plugin for FPSCounter {
     fn build(&self, app: &mut App) {
+        app.insert_resource(Debug { show_debug: false });
         app.add_systems(Startup, setup_fps_counter);
         app.add_systems(Update, (fps_text_update_system, toggle_vsync));
     }

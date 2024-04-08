@@ -37,11 +37,11 @@ pub struct AbilityData {
 
 impl AbilityData {
     pub fn from_type(ability_type: AbilityType) -> Self {
-        return match ability_type {
+        match ability_type {
             AbilityType::FireBall => AbilityData { ability_type: AbilityType::FireBall, cooldown: 2.0, magnitude: 5.0, speed: 100.0 },
-            AbilityType::IceStorm => AbilityData { ability_type: AbilityType::IceStorm, cooldown: 5.0, magnitude: 1.0, speed: 25.0 },
+            AbilityType::IceStorm => AbilityData { ability_type: AbilityType::IceStorm, cooldown: 5.0, magnitude: 5.0, speed: 25.0 },
             AbilityType::HealOrb => AbilityData { ability_type: AbilityType::HealOrb, cooldown: 10.0, magnitude: 10.0, speed: 0.0 }
-        };
+        }
     }
 }
 
@@ -203,7 +203,7 @@ fn use_ability(ability: &mut Ability, origin: &Transform, rotation: Quat, mut co
                 ) = (
                     ability_sprite, 
                     DamageOverTime { tick_damage: ability.ability_data.magnitude, damage_type: DamageType::PHYSICAL, duration: 0.5 }, 
-                    Slow { speed_reduction: ability.ability_data.magnitude * 10.0, duration: ability.ability_data.magnitude },
+                    Slow { speed_reduction: ability.ability_data.magnitude, duration: ability.ability_data.magnitude },
                     RigidBody::KinematicVelocityBased,
                     LockedAxes::ROTATION_LOCKED,
                     Collider::ball(64.0),
@@ -299,7 +299,7 @@ pub fn player_slow(
     for (mut enemy_stats, enemy_entity) in stat_query.iter_mut() {
         for (slow, slow_entity) in slow_query.iter() {
             if rapier.intersection_pair(enemy_entity, slow_entity).is_some() {
-                enemy_stats.add_duration_change(StatType::Speed, slow.speed_reduction, slow.duration, slow_entity.index());
+                enemy_stats.add_duration_change(StatType::Speed, -slow.speed_reduction, slow.duration, slow_entity.index(), false);
             }
         }
     }

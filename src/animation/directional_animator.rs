@@ -8,14 +8,14 @@ pub enum AnimationType { Idle, Walk, Run, Cast, SpecialCast }
 pub enum AnimationDirection { Up, Down, Left, Right }
 
 pub fn vec2_to_direction(vector: &Vec2) -> AnimationDirection {
-    if vector.x.abs() > 0.0 || vector.y.abs() == 0.0 {
+    if vector.x.abs() > 0.5 || vector.y.abs() == 0.5 {
         return if vector.x > 0.0 { AnimationDirection::Right } else { AnimationDirection::Left };
     } else {
         return if vector.y > 0.0 { AnimationDirection::Up } else { AnimationDirection::Down };
     }
 }
 
-#[derive(Component, Reflect)]
+#[derive(Component, Reflect, Clone)]
 pub struct DirectionalAnimator {
     #[reflect(ignore)]
     pub animation_indices: HashMap<AnimationType, HashMap<AnimationDirection, AnimationIndices>>,

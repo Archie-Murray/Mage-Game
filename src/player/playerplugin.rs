@@ -3,6 +3,7 @@ use crate::animation::directional_animator::*;
 use crate::{
     damage::health::{EntityType, Health},
     entity::{stat_type::StatType, stats::Stats},
+    damage::healthbar::HealthBarBundle,
 };
 use bevy::utils::hashbrown::HashMap;
 use bevy_rapier2d::prelude::*;
@@ -33,7 +34,7 @@ pub fn spawn_player(
     let texture_handle: Handle<Image> = assets.load("player/player.png");
     let texture_atlas: TextureAtlas =
         TextureAtlas::from_grid(texture_handle, Vec2::new(48.0, 64.0), 3, 4, None, None);
-    commands.spawn((
+    let player = commands.spawn((
         Player,
         Health::new(100.0, 10, 10, EntityType::Player),
         DirectionalAnimator {
@@ -41,7 +42,7 @@ pub fn spawn_player(
                 (
                     AnimationType::Idle,
                     HashMap::from([
-                        ( AnimationDirection::Up, AnimationIndices::new(0, 0 ),),
+                        ( AnimationDirection::Up, AnimationIndices::new(0, 0),),
                         ( AnimationDirection::Down, AnimationIndices::new(6, 6),),
                         ( AnimationDirection::Left, AnimationIndices::new(9, 9),),
                         ( AnimationDirection::Right, AnimationIndices::new(3, 3),),
@@ -50,10 +51,10 @@ pub fn spawn_player(
                 (
                     AnimationType::Walk,
                     HashMap::from([
-                        ( AnimationDirection::Up, AnimationIndices::new(0, 2),),
-                        ( AnimationDirection::Down, AnimationIndices::new(6, 8),),
-                        ( AnimationDirection::Left, AnimationIndices::new(9, 11),),
-                        ( AnimationDirection::Right, AnimationIndices::new(3, 5),),
+                        ( AnimationDirection::Up,    AnimationIndices::with_frame_length(0,  2, 0.12),),
+                        ( AnimationDirection::Down,  AnimationIndices::with_frame_length(6,  8, 0.12),),
+                        ( AnimationDirection::Left,  AnimationIndices::with_frame_length(9, 11, 0.12),),
+                        ( AnimationDirection::Right, AnimationIndices::with_frame_length(3,  5, 0.12),),
                     ]),
                 ),
             ]),
@@ -76,7 +77,9 @@ pub fn spawn_player(
         Collider::capsule_y(8.0, 16.0),
         Stats::default(),
         AbilitySystem::default(),
-    ));
+    )).id();
+    let health_bar = commands.spawn(HealthBarBundle::new(100.0, assets.load("ui/health_bar.png"))).id();
+    commands.get_entity(player).unwrap().insert_children(0, &[health_bar]);
 }
 
 pub fn animate_player(

@@ -16,7 +16,7 @@ impl Plugin for HealthPlugin {
     }
 }
 
-#[derive(Component, Reflect, InspectorOptions)]
+#[derive(Component, Reflect, InspectorOptions, Clone)]
 #[reflect(InspectorOptions)]
 pub struct Health {
     current_health: f32,
@@ -39,7 +39,7 @@ pub struct DOT {
     pub finished: bool
 }
 
-#[derive(Reflect)]
+#[derive(Reflect, Clone)]
 pub struct DamageTimer {
     pub timer: Timer,
     pub amount: f32
@@ -130,10 +130,22 @@ impl Health {
     }
 
     fn defence_multiplier(&mut self, damage_type: DamageType) -> f32 {
-        return match damage_type {
+        match damage_type {
             DamageType::PHYSICAL => damage::multiplier_from_defence(self.physical_defence),
             DamageType::MAGICAL => damage::multiplier_from_defence(self.magical_defence),
             _ => 1.0
-        };
+        }
+    }
+
+    pub fn get_percent(&self) -> f32 {
+        f32::clamp(self.current_health / self.max_health, 0.0, 1.0)
+    }
+
+    pub fn get_max(&self) -> f32 {
+        self.max_health
+    }
+
+    pub fn get_current(&self) -> f32 {
+        self.current_health
     }
 }

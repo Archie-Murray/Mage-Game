@@ -11,7 +11,11 @@ pub struct AnimationIndices {
 }
 impl AnimationIndices {
     pub fn new(first: usize, last: usize) -> Self {
-        return AnimationIndices {first, last, frame_length: 1.0 / (last as f32 - first as f32).abs() };
+        AnimationIndices {first, last, frame_length: 1.0 / (last as f32 - first as f32).abs() }
+    }
+
+    pub fn with_frame_length(first: usize, last: usize, frame_length: f32) -> Self {
+        AnimationIndices {first, last, frame_length }
     }
 }
 

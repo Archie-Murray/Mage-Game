@@ -5,6 +5,7 @@ use crate::{
 };
 use bevy::{math::Vec2, utils::hashbrown::HashMap};
 
+#[derive(Clone)]
 pub struct EnemyData {
     pub animator: DirectionalAnimator,
     pub sprite_data: SpriteData,
@@ -12,6 +13,7 @@ pub struct EnemyData {
     pub stats: Stats,
 }
 
+#[derive(Clone)]
 pub struct SpriteData {
     pub path: &'static str,
     pub tile_size: Vec2,
@@ -21,7 +23,7 @@ pub struct SpriteData {
     pub offset: Option<Vec2>,
 }
 
-pub fn orc() -> EnemyData {
+pub fn orc_data() -> EnemyData {
     return EnemyData {
         animator: DirectionalAnimator {
             animation_indices: HashMap::from([
@@ -65,7 +67,7 @@ pub fn orc() -> EnemyData {
             padding: None,
             offset: None,
         },
-        stats: Stats::new(1000.0, 25.0, 5.0, 2.0, 10.0, 0.0),
+        stats: Stats::new(1000.0, 25.0, 5.0, 25.0, 10.0, 0.0),
         health: Health::new(1000.0, 25, 5, crate::damage::health::EntityType::Enemy),
     };
 }

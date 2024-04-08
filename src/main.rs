@@ -31,6 +31,7 @@ fn main() {
                         primary_window: Some(Window {
                             title: "Mage Game".into(),
                             resolution: (1920.0, 1080.0).into(),
+                            mode: bevy::window::WindowMode::BorderlessFullscreen,
                             prevent_default_event_handling: false,
                             present_mode: bevy::window::PresentMode::AutoVsync,
                             .. default()
@@ -57,12 +58,15 @@ fn main() {
         .register_type::<abilities::abilities::AbilitySystem>()
         .register_type::<abilities::abilities::AutoDestroy>()
         .register_type::<animation::directional_animator::DirectionalAnimator>()
+        .register_type::<damage::healthbar::HealthBar>()
+        .register_type::<entity::stats::Stats>()
         .add_plugins(damage::health::HealthPlugin)
         .add_plugins(player::playerplugin::PlayerPlugin)
         .add_plugins(abilities::abilities::AbilitySystemPlugin)
         .add_plugins(animation::AnimatorPlugin)
         .add_plugins(FrameTimeDiagnosticsPlugin::default())
         .add_plugins(debug::FPSCounter)
+        .add_plugins(crate::damage::healthbar::HealthBarPlugin)
         .run();
 }
 
@@ -120,11 +124,13 @@ fn set_icon(windows: NonSend<WinitWindows>) {
 pub fn toggle_debug(
     input: Res<Input<KeyCode>>,
     mut render_context: ResMut<DebugRenderContext>,
+    mut debug: ResMut<crate::debug::Debug>, 
     mut fps_root: Query<&mut Visibility, With<debug::FpsRoot>>,
 ) {
     if input.just_pressed(KeyCode::Escape) {
         println!("Toggled render context");
-        render_context.enabled = !render_context.enabled;
+        debug.show_debug = !debug.show_debug;
+        render_context.enabled = debug.show_debug;
         let mut fps_visibility = fps_root.single_mut();
         *fps_visibility = match *fps_visibility {
             Visibility::Hidden => Visibility::Visible,

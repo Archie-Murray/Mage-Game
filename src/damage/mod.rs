@@ -6,4 +6,5 @@ pub fn multiplier_from_defence(defence: i32) -> f32 {
     }
 }
 pub mod health;
+pub mod healthbar;
 pub mod damagetype;

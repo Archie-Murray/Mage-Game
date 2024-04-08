@@ -2780,7 +2780,7 @@ dependencies = [
 
 [[package]]
 name = "mage-game"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "bevy",
  "bevy-inspector-egui",
@@ -2789,6 +2789,7 @@ dependencies = [
  "bevy_hanabi",
  "bevy_rapier2d",
  "image",
+ "rand",
  "thiserror",
  "tiled",
  "winit",

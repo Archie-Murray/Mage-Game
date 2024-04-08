@@ -1,7 +1,9 @@
 use std::time::Duration;
 
+use rand::{thread_rng, Rng};
+
 use bevy::prelude::*;
-use crate::enemy::*;
+use crate::{damage::healthbar::HealthBarBundle, enemy::*, pathfinding::AITarget};
 
 use bevy_rapier2d::prelude::*;
 
@@ -12,17 +14,18 @@ pub struct EnemySpawner {
     pub spawn_delay: f32,
     pub spawn_count: usize,
     pub max_spawns: usize,
+    pub spawn_points: Vec<Vec2>
 }
 
 impl EnemySpawner {
-    pub fn new(enemy_type: EnemyType, spawn_delay: f32, max_spawns: usize) -> Self {
-        return EnemySpawner { enemy_type, spawn_delay, spawn_timer: Timer::from_seconds(spawn_delay, TimerMode::Repeating), spawn_count: 0, max_spawns };
+    pub fn new(enemy_type: EnemyType, spawn_delay: f32, max_spawns: usize, spawn_points: Vec<Vec2>) -> Self {
+        EnemySpawner { enemy_type, spawn_delay, spawn_timer: Timer::from_seconds(spawn_delay, TimerMode::Repeating), spawn_count: 0, max_spawns, spawn_points }
     }
 }
 
 impl Default for EnemyManager {
     fn default() -> Self {
-        return EnemyManager { enemies: Vec::new() };
+        EnemyManager { enemies: Vec::new() }
     }
 }
 
@@ -34,13 +37,13 @@ pub struct EnemyManager {
 pub fn update_spawners(
     time: Res<Time>,
     mut enemies: ResMut<EnemyManager>,
-    mut spawners: Query<(&mut EnemySpawner, &Transform, Entity)>,
+    mut spawners: Query<(&mut EnemySpawner, Entity)>,
     mut commands: Commands,
     assets: Res<AssetServer>,
     mut textures: ResMut<Assets<TextureAtlas>>
 
 ) {
-    for (mut spawner, transform, entity) in spawners.iter_mut() {
+    for (mut spawner, entity) in spawners.iter_mut() {
         if spawner.spawn_count == spawner.max_spawns {
             commands.entity(entity).despawn();
             return;
@@ -48,10 +51,11 @@ pub fn update_spawners(
         spawner.spawn_timer.tick(Duration::from_secs_f32(time.delta_seconds()));
         if spawner.spawn_timer.just_finished() {
             let enemy = Enemy::new(spawner.enemy_type);
-            let enemy_transform = Transform::from_xyz(transform.translation.x, transform.translation.y, 1.0);
+            let position_index = rand::thread_rng().gen_range(0..spawner.spawn_points.len());
+            let enemy_transform = Transform::from_xyz(spawner.spawn_points[position_index].x, spawner.spawn_points[position_index].y, 1.0);
             match spawner.enemy_type {
                 EnemyType::ORC => {
-                    let orc = data::orc();
+                    let orc = data::orc_data();
                     let sprite_bundle: SpriteSheetBundle = SpriteSheetBundle { 
                         sprite: TextureAtlasSprite::new(0), 
                         texture_atlas: textures.add(TextureAtlas::from_grid(
@@ -64,7 +68,7 @@ pub fn update_spawners(
                     let animator = orc.animator;
                     let health = orc.health;
                     let stats = orc.stats;
-                    enemies.enemies.push(commands.spawn(enemy)
+                    let enemy = commands.spawn(enemy)
                         .insert(sprite_bundle)
                         .insert(animator)
                         .insert(health)
@@ -73,7 +77,11 @@ pub fn update_spawners(
                         .insert(RigidBody::Dynamic)
                         .insert(Velocity::default())
                         .insert(LockedAxes::ROTATION_LOCKED)
-                    .id().index());
+                        .insert(AITarget::new(256.0))
+                    .id();
+                    let health_bar = commands.spawn(HealthBarBundle::new(data::orc_data().health.get_max(), assets.load("ui/health_bar.png"))).id();
+                    commands.entity(enemy).push_children(&[health_bar]);
+                    enemies.enemies.push(enemy.index());
                 },
             }
             spawner.spawn_count += 1;

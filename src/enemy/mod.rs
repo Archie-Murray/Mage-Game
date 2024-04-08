@@ -1,4 +1,7 @@
 use bevy::prelude::*;
+use bevy_rapier2d::dynamics::Velocity;
+
+use crate::animation::directional_animator::{vec2_to_direction, AnimationType, DirectionalAnimator};
 
 #[derive(Component)]
 pub struct Enemy {
@@ -21,13 +24,29 @@ impl Plugin for EnemyPlugin {
         app.init_resource::<spawner::EnemyManager>();
         app.add_systems(Startup, spawn_spawners);
         app.add_systems(FixedUpdate, spawner::update_spawners);
+        app.add_systems(Update, update_enemy_animations);
     }
 }
 
 pub fn spawn_spawners(mut commands: Commands) {
     commands.spawn(
-        spawner::EnemySpawner::new(EnemyType::ORC, 1.0, 1))
-            .insert(Transform::from_xyz(-50.0, 50.0, 1.0));
+        spawner::EnemySpawner::new(
+            EnemyType::ORC, 
+            1.0, 
+            1, 
+            vec!(Vec2::new(100.0, 10.0))
+        )).insert(Transform::from_xyz(-50.0, 50.0, 1.0));
+}
+
+pub fn update_enemy_animations(
+    mut enemies: Query<(&Velocity, &mut DirectionalAnimator), With<Enemy>>
+) {
+    for (enemy_vel, mut enemy_anim) in enemies.iter_mut() {
+        if enemy_vel.linvel.length_squared() >= 0.01 {
+            enemy_anim.update_animation(AnimationType::Walk);
+        }
+        enemy_anim.update_direction(vec2_to_direction(&enemy_vel.linvel));
+    }
 }
 
 pub mod spawner;
