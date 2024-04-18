@@ -2,7 +2,6 @@ use bevy::prelude::*;
 use crate::damage::damagetype::DamageType;
 use crate::damage;
 use bevy::utils::hashbrown::HashMap;
-use bevy_inspector_egui::prelude::*;
 
 pub struct HealthPlugin;
 
@@ -16,8 +15,7 @@ impl Plugin for HealthPlugin {
     }
 }
 
-#[derive(Component, Reflect, InspectorOptions, Clone)]
-#[reflect(InspectorOptions)]
+#[derive(Component, Reflect, Clone)]
 pub struct Health {
     current_health: f32,
     max_health: f32,
@@ -50,11 +48,11 @@ pub enum EntityType { Player, Enemy, Boss }
 
 impl Clone for EntityType {
     fn clone(&self) -> Self {
-        return match self {
+        match self {
             Self::Player => EntityType::Player,
             Self::Enemy => EntityType::Enemy,
             Self::Boss => EntityType::Boss
-        };
+        }
     }
 }
 
@@ -77,7 +75,7 @@ pub fn health_update(
     mut query: Query<(&mut Health, Entity)> // Adapt to use health UI later
 ) {
     for (mut health, entity) in query.iter_mut() {
-        if health.damage_timer.timer.percent() <= 0.0 {
+        if health.damage_timer.timer.fraction() <= 0.0 {
             ev_damage.send(HealthDamageEvent { entity,  entity_type: health.entity_type.clone(), amount: health.damage_timer.amount });
             if health.dead {
                 ev_death.send( HealthDeathEvent { entity, entity_type: health.entity_type.clone() });
@@ -90,7 +88,7 @@ pub fn health_update(
 
         let mut finished: Vec<u32> = Vec::new();
 
-        for (entity, mut dot) in health.dots.iter_mut() {
+        for (entity, dot) in health.dots.iter_mut() {
             dot.duration = (dot.duration - time.delta_seconds()).max(0.0);
             if dot.duration == 0.0 {
                 finished.push(*entity);
@@ -105,7 +103,7 @@ pub fn health_update(
 
 impl Health {
     pub fn new(health: f32, physical_defence: i32, magical_defence: i32, entity_type: EntityType) -> Health {
-        return Self { current_health: health, max_health: health, magical_defence, physical_defence, dead: false, is_invulnerable: false, damage_timer: DamageTimer { timer: Timer::from_seconds(0.25, TimerMode::Once), amount: 0.0 }, entity_type, dots: HashMap::new() }
+        Self { current_health: health, max_health: health, magical_defence, physical_defence, dead: false, is_invulnerable: false, damage_timer: DamageTimer { timer: Timer::from_seconds(0.25, TimerMode::Once), amount: 0.0 }, entity_type, dots: HashMap::new() }
     }
 
     pub fn damage(&mut self, mut amount: f32, damage_type: DamageType) {

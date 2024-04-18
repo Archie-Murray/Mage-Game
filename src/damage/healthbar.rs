@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use super::health::{Health, HealthDamageEvent};
+use super::health::{Health};
 
 const LERP_SPEED: f32 = 0.5;
 
@@ -19,7 +19,7 @@ pub struct HealthBarBundle {
 }
 
 impl HealthBarBundle {
-    pub fn new(initial_value: f32, texture: Handle<Image>) -> Self {
+    pub fn new(initial_value: f32, texture: Handle<Image>, offset: Vec2) -> Self {
         Self {
             health_bar: HealthBar {
                 target_value: initial_value,
@@ -28,9 +28,10 @@ impl HealthBarBundle {
             sprite_bundle: SpriteBundle {
                 texture,
                 sprite: Sprite {
-                    anchor: bevy::sprite::Anchor::Center,
+                    anchor: bevy::sprite::Anchor::TopCenter,
                     ..Default::default()
                 },
+                transform: Transform::from_xyz(offset.x, offset.y, 0.0),
                 ..default()
             },
         }

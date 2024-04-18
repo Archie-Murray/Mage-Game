@@ -3,16 +3,15 @@ use bevy::utils::hashbrown::HashMap;
 use super::*;
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone, Copy, Reflect)]
-pub enum AnimationType { Idle, Walk, Run, Cast, SpecialCast }
+pub enum AnimationType { Idle, Walk, Run, Attack, SpecialCast }
 #[derive(PartialEq, Eq, Hash, Debug, Clone, Copy, Reflect)]
 pub enum AnimationDirection { Up, Down, Left, Right }
 
 pub fn vec2_to_direction(vector: &Vec2) -> AnimationDirection {
     if vector.x.abs() > 0.5 || vector.y.abs() == 0.5 {
         return if vector.x > 0.0 { AnimationDirection::Right } else { AnimationDirection::Left };
-    } else {
-        return if vector.y > 0.0 { AnimationDirection::Up } else { AnimationDirection::Down };
     }
+    if vector.y > 0.0 { AnimationDirection::Up } else { AnimationDirection::Down }
 }
 
 #[derive(Component, Reflect, Clone)]
@@ -45,7 +44,7 @@ impl DirectionalAnimator {
 
 pub fn animate_directional(
     time: Res<Time>,
-    mut animators: Query<(&mut DirectionalAnimator, &mut TextureAtlasSprite)>
+    mut animators: Query<(&mut DirectionalAnimator, &mut TextureAtlas)>
 ) {
     for (mut animator, mut sprite) in animators.iter_mut() {
         let animation_indices = *animator.get_animation();

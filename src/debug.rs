@@ -1,3 +1,4 @@
+use bevy::app::AppExit;
 use bevy::diagnostic::DiagnosticsStore;
 use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
 use bevy::prelude::*;
@@ -22,7 +23,7 @@ impl Plugin for FPSCounter {
     fn build(&self, app: &mut App) {
         app.insert_resource(Debug { show_debug: false });
         app.add_systems(Startup, setup_fps_counter);
-        app.add_systems(Update, (fps_text_update_system, toggle_vsync));
+        app.add_systems(Update, (fps_text_update_system, toggle_vsync, listen_for_exit));
     }
 }
  
@@ -100,7 +101,7 @@ fn fps_text_update_system(
     for mut text in &mut query {
         // try to get a "smoothed" FPS value from Bevy
         if let Some(value) = diagnostics
-            .get(FrameTimeDiagnosticsPlugin::FPS)
+            .get(&FrameTimeDiagnosticsPlugin::FPS)
             .and_then(|fps| fps.smoothed())
         {
             // Format the number as to leave space for 4 digits, just in case,
@@ -140,8 +141,8 @@ fn fps_text_update_system(
     }
 }
 
-fn toggle_vsync(input: Res<Input<KeyCode>>, mut windows: Query<&mut Window>) {
-    if input.just_pressed(KeyCode::V) {
+fn toggle_vsync(input: Res<ButtonInput<KeyCode>>, mut windows: Query<&mut Window>) {
+    if input.just_pressed(KeyCode::KeyV) {
         let mut window = windows.single_mut();
 
         window.present_mode = if matches!(window.present_mode, PresentMode::AutoVsync) {
@@ -150,5 +151,12 @@ fn toggle_vsync(input: Res<Input<KeyCode>>, mut windows: Query<&mut Window>) {
             PresentMode::AutoVsync
         };
         info!("PRESENT_MODE: {:?}", window.present_mode);
+    }
+}
+
+fn listen_for_exit(mut exit_evr: EventWriter<AppExit>, mut input: ResMut<ButtonInput<KeyCode>>) {
+    let mut pressed = input.get_pressed().copied();
+    if pressed.find(|key| *key == KeyCode::KeyQ).is_some() && pressed.find(|key| *key == KeyCode::ControlLeft).is_some() {
+        exit_evr.send(AppExit);    
     }
 }

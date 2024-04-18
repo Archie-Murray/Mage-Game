@@ -1,9 +1,11 @@
 use std::time::Duration;
 
-use rand::{thread_rng, Rng};
+use rand::{Rng};
 
 use bevy::prelude::*;
 use crate::{damage::healthbar::HealthBarBundle, enemy::*, pathfinding::AITarget};
+
+
 
 use bevy_rapier2d::prelude::*;
 
@@ -38,9 +40,10 @@ pub fn update_spawners(
     time: Res<Time>,
     mut enemies: ResMut<EnemyManager>,
     mut spawners: Query<(&mut EnemySpawner, Entity)>,
+    mut spawn_event: EventWriter<EnemySpawnEvent>,
     mut commands: Commands,
     assets: Res<AssetServer>,
-    mut textures: ResMut<Assets<TextureAtlas>>
+    mut atlases: ResMut<Assets<TextureAtlasLayout>>
 
 ) {
     for (mut spawner, entity) in spawners.iter_mut() {
@@ -54,13 +57,22 @@ pub fn update_spawners(
             let position_index = rand::thread_rng().gen_range(0..spawner.spawn_points.len());
             let enemy_transform = Transform::from_xyz(spawner.spawn_points[position_index].x, spawner.spawn_points[position_index].y, 1.0);
             match spawner.enemy_type {
-                EnemyType::ORC => {
+                EnemyType::Orc => {
                     let orc = data::orc_data();
+                    let texture_handle: Handle<Image> = assets.load(orc.sprite_data.path);
+                    let layout = TextureAtlasLayout::from_grid(
+                        orc.sprite_data.tile_size, 
+                        orc.sprite_data.columns, 
+                        orc.sprite_data.rows, 
+                        orc.sprite_data.padding, 
+                        orc.sprite_data.offset
+                    );
                     let sprite_bundle: SpriteSheetBundle = SpriteSheetBundle { 
-                        sprite: TextureAtlasSprite::new(0), 
-                        texture_atlas: textures.add(TextureAtlas::from_grid(
-                                assets.load(orc.sprite_data.path), orc.sprite_data.tile_size, orc.sprite_data.columns, orc.sprite_data.rows, orc.sprite_data.padding, orc.sprite_data.offset)
-                        ), 
+                        texture: texture_handle,
+                        atlas: TextureAtlas {
+                            layout: atlases.add(layout),
+                            index: 0
+                        },
                         transform: enemy_transform,
                         ..default()
                     };
@@ -77,11 +89,15 @@ pub fn update_spawners(
                         .insert(RigidBody::Dynamic)
                         .insert(Velocity::default())
                         .insert(LockedAxes::ROTATION_LOCKED)
-                        .insert(AITarget::new(256.0))
+                        .insert(AITarget::new(256.0, 16.0))
+                        .insert(Sensor)
+                        .insert(Enemy::new(EnemyType::Orc))
                     .id();
-                    let health_bar = commands.spawn(HealthBarBundle::new(data::orc_data().health.get_max(), assets.load("ui/health_bar.png"))).id();
+                    let health_bar = commands.spawn(HealthBarBundle::new(data::orc_data().health.get_max(), assets.load("ui/health_bar.png"), Vec2::new(0.0, 32.0))).id();
                     commands.entity(enemy).push_children(&[health_bar]);
                     enemies.enemies.push(enemy.index());
+                    spawn_event.send(EnemySpawnEvent { entity: enemy, enemy_type: EnemyType::Orc });
+                    info!("Sent event");
                 },
             }
             spawner.spawn_count += 1;

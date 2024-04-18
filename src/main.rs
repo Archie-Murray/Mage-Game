@@ -1,5 +1,3 @@
-#![allow(clippy::needless_return)]
-
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
@@ -7,7 +5,7 @@ use bevy::winit::WinitWindows;
 use bevy_hanabi::prelude::*;
 use winit::window::Icon;
 use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
-use bevy_ecs_ldtk::prelude::*;
+use bevy_shader_utils::ShaderUtilsPlugin;
 mod player;
 mod damage;
 mod animation;
@@ -18,6 +16,8 @@ mod map;
 mod pathfinding;
 mod enemy;
 mod debug;
+
+static WORLD_OFFSET: Vec2 = Vec2 { x: -768.0, y: -768.0 };
 
 fn main() {
     App::new()
@@ -43,18 +43,18 @@ fn main() {
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(1.0))
         .insert_resource(RapierConfiguration { gravity: Vec2::ZERO, ..default() })
         .add_plugins(HanabiPlugin)
+        .add_plugins(map::MapPlugin)
+        .add_plugins(ShaderUtilsPlugin)
         .add_plugins(RapierDebugRenderPlugin { enabled: false, ..Default::default() })
-        .add_plugins(LdtkPlugin)
-        .register_ldtk_int_cell::<map::WallBundle>(1)
-        .register_ldtk_int_cell::<map::VoidBundle>(2)
-        .insert_resource(LevelSelection::index(0))
         .add_plugins(abilities::ability_particles::ParticlePlugin)
         .add_plugins(entity::EntityPlugin)
         .add_plugins(enemy::EnemyPlugin)
+        .add_plugins(enemy::orc::OrcPlugin)
+        .register_type::<enemy::Enemy>()
         .add_plugins(pathfinding::PathfindingPlugin)
         .add_plugins(GamePlugin)
         .add_plugins(input::InputPlugin)
-        .add_plugins(WorldInspectorPlugin::new())
+        .add_plugins(WorldInspectorPlugin::default())
         .register_type::<abilities::abilities::AbilitySystem>()
         .register_type::<abilities::abilities::AutoDestroy>()
         .register_type::<animation::directional_animator::DirectionalAnimator>()
@@ -74,8 +74,11 @@ struct GamePlugin;
 
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, (spawn_camera, set_icon, spawn_tilemap.before(player::playerplugin::spawn_player)));
-        app.add_systems(Update, (toggle_debug, map::spawn_wall_collision, map::spawn_void_collision, map::void_collisions));
+        app.add_systems(Startup, (spawn_camera, set_icon));
+        app.insert_resource(pathfinding::Grid::default());
+        app.add_systems(PostStartup, pathfinding::populate_grid);
+        app.register_type::<pathfinding::Grid>();
+        app.add_systems(Update, toggle_debug);
         app.add_systems(Update, camera_follow.after(player::playerplugin::player_move_input));
     }
 }
@@ -95,15 +98,6 @@ fn camera_follow(
 #[derive(Component)]
 pub struct MainCamera;
 
-fn spawn_tilemap(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let map = LdtkWorldBundle {
-        ldtk_handle: asset_server.load("environment/main.ldtk"),
-        transform: Transform::from_xyz(-768.0, -768.0, -10.0),
-        ..default()
-    };
-    commands.spawn(map);
-}
-
 fn spawn_camera(mut commands: Commands) {
     let camera: Camera2dBundle = Camera2dBundle { projection: OrthographicProjection { scale: 1.0 / 3.0, near: -100.0, far: 100.0, ..default() }, ..default() };
     commands.spawn((camera, MainCamera));
@@ -122,7 +116,7 @@ fn set_icon(windows: NonSend<WinitWindows>) {
 }
 
 pub fn toggle_debug(
-    input: Res<Input<KeyCode>>,
+    input: Res<ButtonInput<KeyCode>>,
     mut render_context: ResMut<DebugRenderContext>,
     mut debug: ResMut<crate::debug::Debug>, 
     mut fps_root: Query<&mut Visibility, With<debug::FpsRoot>>,

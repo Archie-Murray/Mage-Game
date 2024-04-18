@@ -1,6 +1,5 @@
 use std::time::Duration;
 use bevy::prelude::*;
-use bevy_inspector_egui::prelude::*;
 use bevy::utils::hashbrown::HashMap;
 
 use bevy_hanabi::prelude::*;
@@ -19,12 +18,10 @@ use crate::player::Player;
 
 use crate::abilities::ability_particles::{AbilityParticle, ParticleType};
 
-#[derive(Reflect, InspectorOptions)]
-#[reflect(InspectorOptions)]
+#[derive(Reflect)]
 pub enum EffectType { Slow, Damage, Heal, Stun }
 
-#[derive(Reflect, InspectorOptions, Hash, PartialEq, Eq, Debug, Copy, Clone)]
-#[reflect(InspectorOptions)]
+#[derive(Reflect, Hash, PartialEq, Eq, Debug, Copy, Clone)]
 pub enum AbilityType { FireBall, IceStorm, HealOrb }
 
 #[derive(Reflect)]
@@ -103,24 +100,33 @@ impl Plugin for AbilitySystemPlugin {
 }
 
 fn init_abilites(
-    mut abilities: ResMut<AbilityBundle>, asset_server: Res<AssetServer>, mut texture_atlases: ResMut<Assets<TextureAtlas>>
+    mut abilities: ResMut<AbilityBundle>, asset_server: Res<AssetServer>, mut atlases: ResMut<Assets<TextureAtlasLayout>>
 ) {
     abilities.sprites = HashMap::from([
         (AbilityType::FireBall, SpriteSheetBundle { 
-            texture_atlas: texture_atlases.add(TextureAtlas::from_grid(asset_server.load("abilities/fire_ball.png"), Vec2::splat(32.0), 5, 1, None, None)),
-            sprite: TextureAtlasSprite::new(0), 
+            texture: asset_server.load("abilities/fire_ball.png"),
+            atlas: TextureAtlas {
+                layout: atlases.add(TextureAtlasLayout::from_grid(Vec2::splat(32.0), 5, 1, None, None)),
+                index: 0,
+            },
             transform: Transform::from_xyz(0.0, 0.0, 1.0),
             .. default()
         }),
         (AbilityType::IceStorm, SpriteSheetBundle { 
-            texture_atlas: texture_atlases.add(TextureAtlas::from_grid(asset_server.load("abilities/ice_storm.png"), Vec2::splat(64.0), 1, 1, None, None)),
-            sprite: TextureAtlasSprite::new(0), 
+            texture:asset_server.load("abilities/ice_storm.png"),
+            atlas: TextureAtlas {
+                layout: atlases.add(TextureAtlasLayout::from_grid(Vec2::splat(64.0), 1, 1, None, None)),
+                index: 0
+            },
             transform: Transform::from_xyz(0.0, 0.0, 1.0),
             .. default()
         }),        
         (AbilityType::HealOrb, SpriteSheetBundle { 
-            texture_atlas: texture_atlases.add(TextureAtlas::from_grid(asset_server.load("abilities/heal_orb.png"), Vec2::splat(32.0), 5, 1, None, None)),
-            sprite: TextureAtlasSprite::new(0), 
+            texture: asset_server.load("abilities/heal_orb.png"),
+            atlas: TextureAtlas {
+                layout: atlases.add(TextureAtlasLayout::from_grid(Vec2::splat(32.0), 5, 1, None, None)),
+                index: 0
+            },
             transform: Transform::from_xyz(0.0, 0.0, 1.0),
             .. default()
         }) 
@@ -134,16 +140,16 @@ pub fn update_abilities(mut query: Query<&mut AbilitySystem>, time: Res<Time>) {
 }
 
 fn is_ability_key(key_code: KeyCode) -> bool {
-    return key_code == KeyCode::Q || key_code == KeyCode::E || key_code == KeyCode::R;
+    key_code == KeyCode::KeyQ || key_code == KeyCode::KeyE || key_code == KeyCode::KeyR
 }
 
 fn get_ability_slot(key_code: &KeyCode) -> Option<usize> {
-    return match key_code {
-        KeyCode::Q => Some(0),
-        KeyCode::E => Some(1),
-        KeyCode::R => Some(2),
+    match key_code {
+        KeyCode::KeyQ => Some(0),
+        KeyCode::KeyE => Some(1),
+        KeyCode::KeyR => Some(2),
         _ => None
-    };
+    }
 }
 
 pub fn cast_ability(
@@ -152,12 +158,12 @@ pub fn cast_ability(
     ability_particles: ResMut<AbilityParticle>,
     mut query: Query<(&mut AbilitySystem, &Transform)>,
     mouse: Res<Mouse>,
-    keyboard: Res<Input<KeyCode>>,
+    keyboard: Res<ButtonInput<KeyCode>>,
 ) {
     let (mut ability_system, transform) = query.single_mut();
     let Some(slot) = get_ability_slot(
         keyboard.get_just_pressed().filter(|key_code| is_ability_key(**key_code)).next()
-        .unwrap_or(&KeyCode::NoConvert)) else { return; };
+        .unwrap_or(&KeyCode::NonConvert)) else { return; };
     let Some(ability ) = ability_system.get_ability(slot) else { return; };
     let mouse_diff = (mouse.world_position - Vec2::new(transform.translation.x, transform.translation.y)).normalize();
     if ability.can_use() {
@@ -194,7 +200,8 @@ fn use_ability(ability: &mut Ability, origin: &Transform, rotation: Quat, mut co
                     AutoDestroy::new(2.0)
                 ); 
                 ability_instance.transform.rotation = rotation;
-                let particles = commands.spawn(ParticleEffectBundle { effect: ParticleEffect::new(ability_particles.particle_effects.get(&ParticleType::FireBall).unwrap().clone()), transform: Transform::from_xyz(0.0, 0.0, 1.0), ..Default::default() }).id();
+                let Some(particle_effect) = ability_particles.particle_effects.get(&ParticleType::FireBall) else { return; };
+                let particles = commands.spawn(ParticleEffectBundle { effect: ParticleEffect::new(particle_effect.clone()), transform: Transform::from_xyz(0.0, 0.0, 1.0), ..Default::default() }).id();
                 commands.spawn((ability_instance , damage, animator, rb, constraints, coll, sensor, vel, ability, auto_destroy)).add_child(particles);
             },
             AbilityType::IceStorm => {

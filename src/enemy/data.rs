@@ -46,7 +46,7 @@ pub fn orc_data() -> EnemyData {
                     ]),
                 ),
                 (
-                    AnimationType::Cast,
+                    AnimationType::Attack,
                     HashMap::from([
                         (AnimationDirection::Up, AnimationIndices::new(72, 77)),
                         (AnimationDirection::Left, AnimationIndices::new(81, 86)),

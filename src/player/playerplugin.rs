@@ -12,13 +12,13 @@ use crate::abilities::abilities::AbilitySystem;
 
 use bevy::prelude::*;
 pub fn player_move_input(
-    keyboard_input: Res<Input<KeyCode>>,
+    keyboard_input: Res<ButtonInput<KeyCode>>,
     mut query: Query<(&mut Velocity, &Stats), With<Player>>,
 ) {
     let input: Vec2 = Vec2::new(
-        (keyboard_input.pressed(KeyCode::D) as i32 - keyboard_input.pressed(KeyCode::A) as i32)
+        (keyboard_input.pressed(KeyCode::KeyD) as i32 - keyboard_input.pressed(KeyCode::KeyA) as i32)
             as f32,
-        (keyboard_input.pressed(KeyCode::W) as i32 - keyboard_input.pressed(KeyCode::S) as i32)
+        (keyboard_input.pressed(KeyCode::KeyW) as i32 - keyboard_input.pressed(KeyCode::KeyS) as i32)
             as f32,
     );
     let (mut velocity, stats) = query.single_mut();
@@ -29,11 +29,11 @@ pub fn player_move_input(
 pub fn spawn_player(
     mut commands: Commands,
     assets: Res<AssetServer>,
-    mut texture_atlases: ResMut<Assets<TextureAtlas>>,
+    mut atlases: ResMut<Assets<TextureAtlasLayout>>,
 ) {
     let texture_handle: Handle<Image> = assets.load("player/player.png");
-    let texture_atlas: TextureAtlas =
-        TextureAtlas::from_grid(texture_handle, Vec2::new(48.0, 64.0), 3, 4, None, None);
+    let layout = TextureAtlasLayout::from_grid(Vec2::new(48.0, 64.0), 3, 4, None, None);
+    let layout_handle = atlases.add(layout);
     let player = commands.spawn((
         Player,
         Health::new(100.0, 10, 10, EntityType::Player),
@@ -63,8 +63,11 @@ pub fn spawn_player(
             last_update_timer: 0.0
         },
         SpriteSheetBundle {
-            texture_atlas: texture_atlases.add(texture_atlas),
-            sprite: TextureAtlasSprite::new(0),
+            texture: texture_handle,
+            atlas: TextureAtlas {
+                layout: layout_handle,
+                index: 0
+            },
             transform: Transform::from_xyz(50.0, 0.0, 1.0),
             ..default()
         },
@@ -78,17 +81,17 @@ pub fn spawn_player(
         Stats::default(),
         AbilitySystem::default(),
     )).id();
-    let health_bar = commands.spawn(HealthBarBundle::new(100.0, assets.load("ui/health_bar.png"))).id();
+    let health_bar = commands.spawn(HealthBarBundle::new(100.0, assets.load("ui/health_bar.png"), Vec2::new(0.0, 24.0))).id();
     commands.get_entity(player).unwrap().insert_children(0, &[health_bar]);
 }
 
 pub fn animate_player(
-    input: Res<Input<KeyCode>>,
+    input: Res<ButtonInput<KeyCode>>,
     mut player_query: Query<&mut DirectionalAnimator, With<Player>>,
 ) {
     let player_input = Vec2::new(
-        (if input.get_pressed().find(|key_press| **key_press == KeyCode::D).is_some() { 1.0 } else { 0.0 }) - (if input.get_pressed().find(|key_press| **key_press == KeyCode::A).is_some() { 1.0 } else { 0.0 }),
-        (if input.get_pressed().find(|key_press| **key_press == KeyCode::W).is_some() { 1.0 } else { 0.0 }) - (if input.get_pressed().find(|key_press| **key_press == KeyCode::S).is_some() { 1.0 } else { 0.0 })
+        (if input.pressed(KeyCode::KeyD) { 1.0 } else { 0.0 }) - (if input.pressed(KeyCode::KeyA) { 1.0 } else { 0.0 }),
+        (if input.pressed(KeyCode::KeyW) { 1.0 } else { 0.0 }) - (if input.pressed(KeyCode::KeyS) { 1.0 } else { 0.0 })
     );
     let Ok(mut player_animator) = player_query.get_single_mut() else { return; };
     if player_input.length_squared() <= 0.01 {
