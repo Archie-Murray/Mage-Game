@@ -56,12 +56,14 @@ impl Clone for EntityType {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Event)]
 pub struct HealthDamageEvent {
     entity: Entity, 
     entity_type: EntityType, 
     amount: f32
 }
+#[allow(dead_code)]
 #[derive(Event)]
 pub struct HealthDeathEvent {
     entity: Entity, 
@@ -143,6 +145,7 @@ impl Health {
         self.max_health
     }
 
+    #[allow(dead_code)]
     pub fn get_current(&self) -> f32 {
         self.current_health
     }

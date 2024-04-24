@@ -154,7 +154,7 @@ fn toggle_vsync(input: Res<ButtonInput<KeyCode>>, mut windows: Query<&mut Window
     }
 }
 
-fn listen_for_exit(mut exit_evr: EventWriter<AppExit>, mut input: ResMut<ButtonInput<KeyCode>>) {
+fn listen_for_exit(mut exit_evr: EventWriter<AppExit>, input: Res<ButtonInput<KeyCode>>) {
     let mut pressed = input.get_pressed().copied();
     if pressed.find(|key| *key == KeyCode::KeyQ).is_some() && pressed.find(|key| *key == KeyCode::ControlLeft).is_some() {
         exit_evr.send(AppExit);    

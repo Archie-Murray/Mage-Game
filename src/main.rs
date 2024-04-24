@@ -17,7 +17,7 @@ mod pathfinding;
 mod enemy;
 mod debug;
 
-static WORLD_OFFSET: Vec2 = Vec2 { x: -768.0, y: -768.0 };
+static WORLD_SIZE: IVec2 = IVec2::new(2048, 2048);
 
 fn main() {
     App::new()
@@ -40,7 +40,7 @@ fn main() {
                 }
             ),
         )
-        .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(1.0))
+        .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         .insert_resource(RapierConfiguration { gravity: Vec2::ZERO, ..default() })
         .add_plugins(HanabiPlugin)
         .add_plugins(map::MapPlugin)
@@ -75,9 +75,8 @@ struct GamePlugin;
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, (spawn_camera, set_icon));
-        app.insert_resource(pathfinding::Grid::default());
-        app.add_systems(PostStartup, pathfinding::populate_grid);
         app.register_type::<pathfinding::Grid>();
+        app.insert_resource(pathfinding::Grid::default());
         app.add_systems(Update, toggle_debug);
         app.add_systems(Update, camera_follow.after(player::playerplugin::player_move_input));
     }

@@ -89,7 +89,7 @@ pub fn update_spawners(
                         .insert(RigidBody::Dynamic)
                         .insert(Velocity::default())
                         .insert(LockedAxes::ROTATION_LOCKED)
-                        .insert(AITarget::new(256.0, 16.0))
+                        .insert(AITarget::new(256.0, 16.0, false))
                         .insert(Sensor)
                         .insert(Enemy::new(EnemyType::Orc))
                     .id();

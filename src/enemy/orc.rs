@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use bevy::{ecs::query::QuerySingleError, prelude::*};
+use crate::pathfinding::{AIPath, Grid};
 use crate::{pathfinding::AITarget, player::Player};
 use crate::entity::stats::Stats;
 use crate::{damage::{damagetype::DamageType, health::Health}, entity::stat_type::StatType::{self}};
@@ -73,13 +74,18 @@ fn idle_update(
 }
 
 fn wander_enter(
-    mut orcs: Query<(&mut Enemy, &mut DirectionalAnimator, &mut AITarget), Added<OrcWander>>
+    mut orcs: Query<(&mut Enemy, &mut DirectionalAnimator, &mut AITarget, &Transform), Added<OrcWander>>,
+    grid: Res<Grid>
 ) {
     let mut rng = rand::thread_rng();
-    for (mut enemy, mut anim, mut ai) in orcs.iter_mut() {
+    for (mut enemy, mut anim, mut ai, transform) in orcs.iter_mut() {
         ai.do_path_find = true;
-        let angle = rng.gen_range(-2.0 * std::f32::consts::PI..2.0 * std::f32::consts::PI);
-        ai.destination = Vec2::new(angle.cos() * 100.0, angle.sin() * 100.0);
+        let angle = rng.gen_range(-2.0 * std::f32::consts::PI..2.0 * std::f32::consts::PI).to_radians();
+        let pos = Vec2::new(transform.translation.x + angle.cos() * 100.0, transform.translation.y.sin() * 100.0);
+        if let Some(grid_pos) = grid.sample_position(&(transform.translation.truncate() + pos).as_ivec2(), (pos - transform.translation.truncate()).normalize()) {
+            ai.destination = Vec2::new(grid_pos.0 as f32, grid_pos.1 as f32);
+            info!("Intialised orc with wander target: ({}, {})", grid_pos.0, grid_pos.1);
+        }
         enemy.enemy_state = EnemyState::Wander;
         anim.update_animation(AnimationType::Walk);
     }
@@ -88,20 +94,29 @@ fn wander_enter(
 fn wander_update(
     mut commands: Commands,
     player_query: Query<&Transform, With<Player>>,
-    mut orcs: Query<(Entity, &Transform, &AITarget), With<OrcWander>>
+    mut orcs: Query<(Entity, &Transform, &AITarget, Option<&AIPath>), With<OrcWander>>
 ) {
     let Some(player_pos) = get_player_pos(player_query.get_single()) else {
-        for (en, _, _) in orcs.iter() {
-            commands.entity(en).remove::<OrcWander>().insert(OrcIdle);      
+        for (en, _, _, _) in orcs.iter() {
+            commands.entity(en).remove::<OrcWander>().insert(OrcIdle);
         }
         return;
     };
-    for (en, transform, ai) in orcs.iter_mut() {
+    for (entity, transform, ai, path) in orcs.iter_mut() {
         if player_pos.distance_squared(transform.translation.truncate()) <= POS_ERROR {
-            commands.entity(en).remove::<OrcWander>().insert(OrcChase);
+            info!("Player in range!");
+            if path.is_some() {
+                commands.entity(entity).remove::<AIPath>();
+            }
+            commands.entity(entity).remove::<OrcWander>().insert(OrcChase);
         }
         if transform.translation.truncate().distance_squared(ai.destination) <= POS_ERROR {
-            commands.entity(en).remove::<OrcWander>().insert(OrcIdle);      
+            info!("Player ({:?}) is {} away from orc: {:?}", player_pos.distance_squared(transform.translation.truncate()), player_pos, transform.translation.truncate());
+            if path.is_some() {
+                commands.entity(entity).remove::<AIPath>();
+            }
+            commands.entity(entity).remove::<OrcWander>().insert(OrcIdle);
+            info!("Orc {} has reached wander destination!", entity.index());
             continue;
         }
     }
@@ -117,21 +132,30 @@ fn chase_enter(
 }
 
 fn chase_update(
+    grid: Res<Grid>,
     mut commands: Commands,
     player_query: Query<&Transform, With<Player>>,
-    orcs: Query<(Entity, &Transform, &AITarget), With<OrcChase>>
+    mut orcs: Query<(Entity, &Transform, &mut AITarget, Option<&AIPath>), With<OrcChase>>
 ) {
     let Some(player_pos) = get_player_pos(player_query.get_single()) else {
-        for (entity, _, _) in orcs.iter() {
+        for (entity, _, _, _) in orcs.iter() {
             commands.entity(entity).remove::<OrcChase>().insert(OrcIdle);
         }
         return;
     };
-    for (entity, transform, ai) in orcs.iter() {
+    for (entity, transform, mut ai, path) in orcs.iter_mut() {
         let distance_to_player = transform.translation.truncate().distance(player_pos);
         if distance_to_player >= ai.follow_range {
-            commands.entity(entity).remove::<OrcChase>().insert(OrcWander);
+            if path.is_some() {
+                commands.entity(entity).remove::<OrcChase>().insert(OrcWander);
+            }
             continue;
+        }
+        if ai.destination.distance_squared(player_pos) >= POS_ERROR {
+            commands.entity(entity).remove::<AIPath>();
+            if let Some((pos_x, pos_y)) = grid.sample_position(&player_pos.as_ivec2(), (player_pos - transform.translation.truncate()).normalize()) {
+                ai.destination = Vec2::new(pos_x as f32, pos_y as f32);
+            } 
         }
         if distance_to_player <= ai.attack_range {
             commands.entity(entity).remove::<OrcChase>().insert(OrcAttack);
