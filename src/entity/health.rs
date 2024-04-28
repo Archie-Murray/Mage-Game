@@ -1,6 +1,9 @@
 use bevy::prelude::*;
-use crate::damage::damagetype::DamageType;
-use crate::damage;
+use bevy_hanabi::{ParticleEffect, ParticleEffectBundle};
+use crate::abilities::abilities::AutoDestroy;
+use crate::entity::particles::ParticleType;
+use crate::entity::particles::Particles;
+use super::damage::*;
 use bevy::utils::hashbrown::HashMap;
 
 pub struct HealthPlugin;
@@ -11,7 +14,7 @@ impl Plugin for HealthPlugin {
             .add_event::<HealthDamageEvent>()
             .add_event::<HealthDeathEvent>()
             .register_type::<Health>()
-            .add_systems(Update, health_update);
+            .add_systems(Update, (health_update, on_damage));
     }
 }
 
@@ -23,10 +26,22 @@ pub struct Health {
     physical_defence: i32,
     dead: bool,
     is_invulnerable: bool,
-    damage_timer: DamageTimer,
     entity_type: EntityType,
+    incoming_damage: Vec<DamageInstance>,
     #[reflect(ignore)]
     dots: HashMap<u32, DOT>
+}
+
+#[derive(Debug, Reflect, Clone, Copy)]
+pub struct DamageInstance {
+    amount: f32, 
+    damage_type: DamageType,
+}
+
+impl DamageInstance {
+    pub fn new(amount: f32, damage_type: DamageType) -> Self {
+        DamageInstance { amount, damage_type }
+    }
 }
 
 #[derive(Clone, Reflect, Copy)]
@@ -35,12 +50,6 @@ pub struct DOT {
     pub duration: f32, 
     pub damage_type: DamageType,
     pub finished: bool
-}
-
-#[derive(Reflect, Clone)]
-pub struct DamageTimer {
-    pub timer: Timer,
-    pub amount: f32
 }
 
 #[derive(Reflect)]
@@ -60,9 +69,23 @@ impl Clone for EntityType {
 #[derive(Event)]
 pub struct HealthDamageEvent {
     entity: Entity, 
-    entity_type: EntityType, 
+    entity_type: EntityType,
+    pos: Vec2,
     amount: f32
 }
+
+fn on_damage(mut commands: Commands, mut evr: EventReader<HealthDamageEvent>, particles: Res<Particles>) {
+    let Some(effect) = particles.effects.get(&ParticleType::Hit) else { return; };
+    for event in evr.read() {
+        info!("{} was damaged!", event.entity.index());
+        commands.spawn(ParticleEffectBundle {
+            effect: ParticleEffect::new(effect.clone()),
+            transform: Transform::from_translation(event.pos.extend(10.0)).with_scale(Vec3::splat(10.0)),
+            ..Default::default()
+        }).insert(AutoDestroy::new(10.0));
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Event)]
 pub struct HealthDeathEvent {
@@ -74,14 +97,22 @@ pub fn health_update(
     time: Res<Time>, 
     mut ev_damage: EventWriter<HealthDamageEvent>, 
     mut ev_death: EventWriter<HealthDeathEvent>, 
-    mut query: Query<(&mut Health, Entity)> // Adapt to use health UI later
+    mut query: Query<(&mut Health, Entity, &Transform), Changed<Health>> // Adapt to use health UI later
 ) {
-    for (mut health, entity) in query.iter_mut() {
-        if health.damage_timer.timer.fraction() <= 0.0 {
-            ev_damage.send(HealthDamageEvent { entity,  entity_type: health.entity_type.clone(), amount: health.damage_timer.amount });
-            if health.dead {
-                ev_death.send( HealthDeathEvent { entity, entity_type: health.entity_type.clone() });
-            }
+    let mut damage_instances = Vec::<DamageInstance>::new();
+    for (mut health, entity, transform) in query.iter_mut() {
+        let en_type = health.entity_type.clone();
+        for damage_instance in &health.incoming_damage {
+            ev_damage.send(HealthDamageEvent { entity, entity_type: en_type.clone(), amount: damage_instance.amount, pos: transform.translation.truncate() });
+            damage_instances.push(damage_instance.clone());
+        }
+        for damage_instance in damage_instances.iter() {
+            health.damage(damage_instance.amount, damage_instance.damage_type);
+        }
+        health.incoming_damage.clear();
+        damage_instances.clear();
+        if health.dead {
+            ev_death.send( HealthDeathEvent { entity, entity_type: health.entity_type.clone() });
         }
 
         if health.dots.len() == 0 {
@@ -92,9 +123,14 @@ pub fn health_update(
 
         for (entity, dot) in health.dots.iter_mut() {
             dot.duration = (dot.duration - time.delta_seconds()).max(0.0);
+            damage_instances.push(DamageInstance::new(dot.tick_damage * time.delta_seconds(), dot.damage_type));
             if dot.duration == 0.0 {
                 finished.push(*entity);
             }
+        }
+        
+        for damage_instance in damage_instances.iter() {
+            health.push_damage(damage_instance.amount, damage_instance.damage_type);
         }
 
         for id in finished {
@@ -105,15 +141,17 @@ pub fn health_update(
 
 impl Health {
     pub fn new(health: f32, physical_defence: i32, magical_defence: i32, entity_type: EntityType) -> Health {
-        Self { current_health: health, max_health: health, magical_defence, physical_defence, dead: false, is_invulnerable: false, damage_timer: DamageTimer { timer: Timer::from_seconds(0.25, TimerMode::Once), amount: 0.0 }, entity_type, dots: HashMap::new() }
+        Self { current_health: health, max_health: health, magical_defence, physical_defence, dead: false, is_invulnerable: false, incoming_damage: Vec::new(), entity_type, dots: HashMap::new() }
     }
 
-    pub fn damage(&mut self, mut amount: f32, damage_type: DamageType) {
+    pub fn push_damage(&mut self, amount: f32, damage_type: DamageType) {
+        self.incoming_damage.push(DamageInstance::new(amount, damage_type));
+    }
+
+    fn damage(&mut self, mut amount: f32, damage_type: DamageType) {
         if !self.dead && !self.is_invulnerable {
             amount *= self.defence_multiplier(damage_type);
             self.current_health = f32::max(0.0, self.current_health - amount);
-            self.damage_timer.timer.reset();
-            self.damage_timer.amount = amount;
             if self.current_health == 0.0 {
                 self.dead = true;
             }
@@ -131,8 +169,8 @@ impl Health {
 
     fn defence_multiplier(&mut self, damage_type: DamageType) -> f32 {
         match damage_type {
-            DamageType::PHYSICAL => damage::multiplier_from_defence(self.physical_defence),
-            DamageType::MAGICAL => damage::multiplier_from_defence(self.magical_defence),
+            DamageType::PHYSICAL => multiplier_from_defence(self.physical_defence),
+            DamageType::MAGICAL => multiplier_from_defence(self.magical_defence),
             _ => 1.0
         }
     }

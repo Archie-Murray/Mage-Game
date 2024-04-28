@@ -6,13 +6,13 @@ use bevy::utils::hashbrown::HashMap;
 pub enum ParticleType { FireBall, IceStorm, HealOrb, FireBallDetonate, IceStormFinish, HealOrbDetonate }
 
 #[derive(Resource)]
-pub struct AbilityParticle {
+pub struct AbilityParticles {
     pub particle_effects: HashMap<ParticleType, Handle<EffectAsset>>
 }
 
-impl Default for AbilityParticle {
+impl Default for AbilityParticles {
     fn default() -> Self {
-        return AbilityParticle {
+        return AbilityParticles {
             particle_effects: HashMap::new()
         };
     }
@@ -22,24 +22,24 @@ pub struct ParticlePlugin;
 
 impl Plugin for ParticlePlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<AbilityParticle>();
+        app.init_resource::<AbilityParticles>();
         app.add_systems(Startup, init_particles);
     }
 }
 
 pub fn init_particles(
     mut effects: ResMut<Assets<EffectAsset>>,
-    mut particles: ResMut<AbilityParticle>
+    mut particles: ResMut<AbilityParticles>
 ) {
-    let ice_effects = create_ice_storm_particles(&mut effects);
-    let fire_effects = create_fire_ball_particles(&mut effects);
-    let heal_effects = create_heal_orb_particles(&mut effects);
-    particles.particle_effects.insert(ParticleType::IceStorm, ice_effects.0);
-    particles.particle_effects.insert(ParticleType::IceStormFinish, ice_effects.1);
-    particles.particle_effects.insert(ParticleType::FireBall, fire_effects.0);
-    particles.particle_effects.insert(ParticleType::FireBallDetonate, fire_effects.1);
-    particles.particle_effects.insert(ParticleType::HealOrb, heal_effects.0);
-    particles.particle_effects.insert(ParticleType::HealOrbDetonate, heal_effects.1);
+    let ( ice_effect,  ice_effects_end) = create_ice_storm_particles(&mut effects);
+    let (fire_effect, fire_effects_end) = create_fire_ball_particles(&mut effects);
+    let (heal_effect, heal_effects_end) = create_heal_orb_particles(&mut effects);
+    particles.particle_effects.insert(ParticleType::IceStorm,         ice_effect);
+    particles.particle_effects.insert(ParticleType::IceStormFinish,   ice_effects_end);
+    particles.particle_effects.insert(ParticleType::FireBall,         fire_effect);
+    particles.particle_effects.insert(ParticleType::FireBallDetonate, fire_effects_end);
+    particles.particle_effects.insert(ParticleType::HealOrb,          heal_effect);
+    particles.particle_effects.insert(ParticleType::HealOrbDetonate,  heal_effects_end);
 }
 
 fn create_ice_storm_particles(effects: &mut ResMut<Assets<EffectAsset>>) -> (Handle<EffectAsset>, Handle<EffectAsset>) {
@@ -146,10 +146,10 @@ fn create_ice_storm_particles(effects: &mut ResMut<Assets<EffectAsset>>) -> (Han
 }
 
 fn create_fire_ball_particles(effects: &mut ResMut<Assets<EffectAsset>>) -> (Handle<EffectAsset>, Handle<EffectAsset>) {
-    let mut fire_colour_grad = Gradient::new();
-    fire_colour_grad.add_key(0.0, Vec4::new(1.0, 1.0, 0.0, 1.0));
-    fire_colour_grad.add_key(1.0, Vec4::new(1.0, 0.0, 0.0, 1.0));
-    fire_colour_grad.add_key(1.0, Vec4::new(1.0, 0.0, 0.0, 0.0));
+    let fire_colour_grad = Gradient::linear(
+        Vec4::new(1.0, 1.0, 0.0, 1.0),
+        Vec4::new(1.0, 0.0, 0.0, 0.5)
+    );
 
     let fire_size_grad = Gradient::linear(Vec2::ZERO, Vec2::splat(10.0));
 

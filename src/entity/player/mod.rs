@@ -1,16 +1,20 @@
-use crate::animation::*;
-use crate::animation::directional_animator::*;
-use crate::{
-    damage::health::{EntityType, Health},
-    entity::{stat_type::StatType, stats::Stats},
-    damage::healthbar::HealthBarBundle,
+use bevy::prelude::*;
+
+#[derive(Component)]
+pub struct Player;
+
+
+use crate::animation::{*, directional_animator::*};
+use super::{
+    health::{EntityType, Health},
+    stats::{Stats, StatType},
 };
+
+use crate::ui::healthbar::HealthBarBundle;
 use bevy::utils::hashbrown::HashMap;
 use bevy_rapier2d::prelude::*;
-use crate::player::Player;
 use crate::abilities::abilities::AbilitySystem;
 
-use bevy::prelude::*;
 pub fn player_move_input(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mut query: Query<(&mut Velocity, &Stats), With<Player>>,
@@ -22,8 +26,8 @@ pub fn player_move_input(
             as f32,
     );
     let (mut velocity, stats) = query.single_mut();
-    velocity.linvel =
-        *stats.get_stat(StatType::Speed).unwrap_or(&50.0) * input; //NOTE: Rapier already applies deltaTime multiplication
+    // NOTE: Rapier already applies deltaTime multiplication
+    velocity.linvel = *stats.get_stat(StatType::Speed).unwrap_or(&50.0) * input; 
 }
 
 pub fn spawn_player(

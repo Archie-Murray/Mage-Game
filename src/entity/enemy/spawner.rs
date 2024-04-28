@@ -1,9 +1,9 @@
 use std::time::Duration;
 
-use rand::{Rng};
+use rand::Rng;
 
 use bevy::prelude::*;
-use crate::{damage::healthbar::HealthBarBundle, enemy::*, pathfinding::AITarget};
+use crate::{ui::healthbar::HealthBarBundle, enemy::*, pathfinding::AITarget};
 
 
 

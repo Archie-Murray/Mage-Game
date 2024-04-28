@@ -6,17 +6,15 @@ use bevy_hanabi::prelude::*;
 
 use bevy_rapier2d::prelude::*;
 
-use crate::entity::stat_type::StatType;
 use crate::input::Mouse;
 
 use crate::animation::looping_animator::LoopingAnimator;
 
-use crate::damage::{health::Health, damagetype::DamageType};
-use crate::entity::stats::Stats;
+use crate::entity::{health::Health, stats::{Stats, StatType}, damage::DamageType};
 
 use crate::player::Player;
 
-use crate::abilities::ability_particles::{AbilityParticle, ParticleType};
+use crate::abilities::ability_particles::{AbilityParticles, ParticleType};
 
 #[derive(Reflect)]
 pub enum EffectType { Slow, Damage, Heal, Stun }
@@ -155,7 +153,7 @@ fn get_ability_slot(key_code: &KeyCode) -> Option<usize> {
 pub fn cast_ability(
     commands: Commands,
     ability_sprites: ResMut<AbilityBundle>,
-    ability_particles: ResMut<AbilityParticle>,
+    ability_particles: ResMut<AbilityParticles>,
     mut query: Query<(&mut AbilitySystem, &Transform)>,
     mouse: Res<Mouse>,
     keyboard: Res<ButtonInput<KeyCode>>,
@@ -176,7 +174,7 @@ pub fn cast_ability(
 
 }
 
-fn use_ability(ability: &mut Ability, origin: &Transform, rotation: Quat, mut commands: Commands, mut ability_sprites: ResMut<AbilityBundle>, ability_particles: ResMut<AbilityParticle>) {
+fn use_ability(ability: &mut Ability, origin: &Transform, rotation: Quat, mut commands: Commands, mut ability_sprites: ResMut<AbilityBundle>, ability_particles: ResMut<AbilityParticles>) {
     ability.cooldown_timer.set_duration(Duration::from_secs_f32(ability.ability_data.cooldown));
     ability.cooldown_timer.reset();
     if let Some(mut ability_sprite) = ability_sprites.sprites.get_mut(&ability.ability_data.ability_type).cloned() {
@@ -275,7 +273,7 @@ pub fn player_damage(
     for (mut enemy_health, enemy_entity) in health_query.iter_mut() {
         for (damage, damage_entity) in damage_query.iter() {
             if rapier.intersection_pair(enemy_entity, damage_entity).is_some() {
-                enemy_health.damage(damage.damage_amount, damage.damage_type);
+                enemy_health.push_damage(damage.damage_amount, damage.damage_type);
                 println!("Damaged entity: {}", enemy_entity.index());
                 commands.entity(enemy_entity).despawn_recursive();
                 break;
@@ -365,7 +363,7 @@ pub struct AutoDestroy {
 }
 
 impl AutoDestroy {
-    fn new(duration: f32) -> AutoDestroy {
+    pub fn new(duration: f32) -> AutoDestroy {
         return AutoDestroy { duration, remaining: duration };
     }
 }
@@ -374,7 +372,7 @@ fn auto_destroy_abilities(
     time: Res<Time>,
     mut commands: Commands, 
     mut query: Query<(&mut AutoDestroy, &AbilityTag, &Transform, Entity), With<AbilityTag>>,
-    particles: Res<AbilityParticle>
+    particles: Res<AbilityParticles>
 ) {
     let mut to_destroy: Vec<(Entity, AbilityType, &Vec3)> = Vec::new();
     for (mut auto_destroy, ability, transform, entity) in query.iter_mut() {

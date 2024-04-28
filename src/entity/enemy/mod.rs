@@ -3,6 +3,10 @@ use bevy_rapier2d::dynamics::Velocity;
 
 use crate::animation::directional_animator::{vec2_to_direction, AnimationType, DirectionalAnimator};
 
+pub mod spawner;
+pub mod orc;
+pub mod data;
+
 #[derive(Component, Reflect)]
 pub struct Enemy {
     pub enemy_type: EnemyType,
@@ -74,6 +78,3 @@ pub fn update_enemy_animations(
     }
 }
 
-pub mod spawner;
-pub mod data;
-pub mod orc;

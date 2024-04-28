@@ -8,7 +8,7 @@ use futures_lite::future;
 use pathfinding::prelude::astar;
 
 use crate::{
-    entity::{stat_type::StatType, stats::Stats},
+    entity::stats::{Stats, StatType},
     WORLD_SIZE,
 };
 
@@ -37,6 +37,16 @@ impl AITarget {
 pub struct AIPath {
     pub index: usize,
     pub points: VecDeque<IVec2>,
+}
+
+impl AIPath {
+    pub fn get_target(&self) -> IVec2 {
+        self.points[self.index]
+    }
+
+    pub fn get_target_world(&self, grid: &Grid) -> Vec2 {
+        grid.grid_to_world_coords(&self.get_target())
+    }
 }
 
 pub struct Path {
@@ -228,13 +238,10 @@ pub fn traverse_path(mut ai_pathfinders: Query<(&mut Velocity, &AITarget, &Trans
     for (mut pathfinder, target, transform, stats, mut ai) in ai_pathfinders.iter_mut() {
         if !target.do_path_find { pathfinder.linvel = Vec2::ZERO; continue; }
         let speed = *(stats.get_stat(StatType::Speed).unwrap_or(&100.0));
-        if grid.grid_to_world_coords(&ai.points[ai.index]).distance_squared(transform.translation.truncate()) <= 10.0 && ai.index < ai.points.len() - 1 {
+        if ai.get_target_world(&grid).distance_squared(transform.translation.truncate()) <= 10.0 && ai.index < ai.points.len() - 1 {
             ai.index += 1;
-        } else {
-            return;
         }
-        let target_pos = grid.grid_to_world_coords(&ai.points[ai.index]);
-        pathfinder.linvel = (target_pos - transform.translation.truncate()).normalize() * speed;
+        pathfinder.linvel = (ai.get_target_world(&grid) - transform.translation.truncate()).normalize() * speed;
     }
 }
 

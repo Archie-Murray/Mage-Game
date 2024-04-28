@@ -1,7 +1,10 @@
 use bevy::prelude::*;
 use bevy::utils::hashbrown::HashMap;
 use bevy_inspector_egui::InspectorOptions;
-use crate::entity::stat_type::StatType;
+
+#[derive(Clone, Copy, Hash, Eq, PartialEq, Reflect, Debug)]
+pub enum StatType { Health, Defence, MagicDefence, Attack, Magic, Speed }
+
 #[derive(Component, Clone, Reflect, InspectorOptions)]
 pub struct Stats {
     pub stats: [Stat; 6],

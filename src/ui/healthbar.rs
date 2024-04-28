@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use super::health::{Health};
+use crate::entity::health::Health;
 
 const LERP_SPEED: f32 = 0.5;
 

@@ -3,8 +3,7 @@ use std::time::Duration;
 use bevy::{ecs::query::QuerySingleError, prelude::*};
 use crate::pathfinding::{AIPath, Grid};
 use crate::{pathfinding::AITarget, player::Player};
-use crate::entity::stats::Stats;
-use crate::{damage::{damagetype::DamageType, health::Health}, entity::stat_type::StatType::{self}};
+use crate::entity::{health::Health, damage::DamageType, stats::{Stats, StatType}};
 
 use super::*;
 use rand::Rng;
@@ -176,7 +175,7 @@ fn attack_enter(
         enemy.enemy_state = EnemyState::Attack;
         enemy.action_timer = Timer::from_seconds(1.0, TimerMode::Once);
         let Some(damage) = stats.get_stat(StatType::Attack) else { continue; };
-        player_health.damage(*damage, DamageType::PHYSICAL);
+        player_health.push_damage(*damage, DamageType::PHYSICAL);
     }
 }
 

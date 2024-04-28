@@ -2,10 +2,10 @@ use std::io::Write;
 
 use bevy::{prelude::*, render::render_resource::AsBindGroup, sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle}};
 use rand::Rng;
-use crate::{damage::{damagetype::DamageType, health::Health}, pathfinding::Grid, WORLD_SIZE};
+use crate::{entity::{damage::DamageType, health::Health}, pathfinding::Grid, WORLD_SIZE};
 use bevy_rapier2d::prelude::*;
 
-static MAP_WIDTH: IVec2 = IVec2 { x: 512, y: 512 };
+static GROUND_DIMENSIONS: Vec2 = Vec2 { x: 1184.0, y: 1312.0 };
 
 #[derive(Debug, Clone, Reflect)]
 pub enum WallType {
@@ -60,7 +60,7 @@ fn spawn_map(
     let void = MaterialMesh2dBundle {
         mesh: bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(Rectangle::default()))),
         material: perlin_materials.add(Perlin2dMaterial { time: 0.0 }),
-        transform: Transform::from_scale(Vec3::splat(2048.0)).with_translation(Vec2::new(MAP_WIDTH.x as f32 / 2.0, 0.0).extend(-11.0)),
+        transform: Transform::from_scale(Vec3::splat(2048.0)).with_translation(Vec2::ZERO.extend(-10.0)),
         ..default()
     };
 
@@ -70,12 +70,12 @@ fn spawn_map(
 
     let ground = SpriteBundle {
         texture: asset_server.load("environment/ground.png"),
-        transform: Transform::from_translation((0.5 * MAP_WIDTH.as_vec2()).extend(-10.0)),
+        transform: Transform::from_xyz(0.0, 0.0, -9.0),
         ..default()
     };
     commands
         .spawn(ground)
-        .insert(Collider::ball(MAP_WIDTH.x as f32))
+        .insert(Collider::ball((GROUND_DIMENSIONS.x + GROUND_DIMENSIONS.y) / 4.0))
         .insert(Ground)
         .insert(Sensor);
 
@@ -87,7 +87,7 @@ fn spawn_map(
     ];
 
     for angle in angles {
-        let distance = rng.gen_range(MAP_WIDTH.x as f32 * 0.5..MAP_WIDTH.x as f32 * 0.75);
+        let distance = rng.gen_range(GROUND_DIMENSIONS.x as f32 * 0.5..GROUND_DIMENSIONS.x as f32 * 0.75);
         let radius: f32 = match angle.round() as i32 / 90 {
             0 => 32.0,
             1 => 24.0,
@@ -115,7 +115,7 @@ fn do_void_damage(
     let Ok(ground) = ground_q.get_single() else { error!("Multiple ground entities?"); return; };
     for (health_entity, mut health) in health_entities.iter_mut() {
         if !rapier.intersection_pair(health_entity, ground).unwrap_or(false) {
-            health.damage(0.1, DamageType::BYPASS);
+            health.push_damage(0.1, DamageType::BYPASS);
         }
     }
 }

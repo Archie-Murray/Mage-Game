@@ -1,6 +1,6 @@
 use crate::{
     animation::{directional_animator::*, *},
-    damage::health::Health,
+    entity::health::Health,
     entity::stats::Stats,
 };
 use bevy::{math::Vec2, utils::hashbrown::HashMap};
@@ -68,6 +68,6 @@ pub fn orc_data() -> EnemyData {
             offset: None,
         },
         stats: Stats::new(1000.0, 25.0, 5.0, 25.0, 10.0, 0.0),
-        health: Health::new(1000.0, 25, 5, crate::damage::health::EntityType::Enemy),
+        health: Health::new(1000.0, 25, 5, crate::entity::health::EntityType::Enemy),
     };
 }
