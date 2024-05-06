@@ -12,7 +12,8 @@ use crate::{
     WORLD_SIZE,
 };
 
-const GRID_SIZE: i32 = 512;
+pub const GRID_SIZE: i32 = 512;
+pub static GRID_TOLERANCE: f32 = (WORLD_SIZE.x / GRID_SIZE) as f32;
 
 #[derive(Component, Reflect)]
 pub struct AITarget {
@@ -111,7 +112,8 @@ impl Grid {
             |p| (p.as_vec2().distance(end.as_vec2())).round() as i32 / 3,
             |p| p.as_vec2().distance_squared(end.as_vec2()) <= 2.0,
         );
-        if let Some((steps, _length)) = result {
+        if let Some((mut steps, _length)) = result {
+            steps.push(*end);
             Ok(Path { steps })
         } else {
             Err(PathfindingError)
@@ -238,10 +240,10 @@ pub fn traverse_path(mut ai_pathfinders: Query<(&mut Velocity, &AITarget, &Trans
     for (mut pathfinder, target, transform, stats, mut ai) in ai_pathfinders.iter_mut() {
         if !target.do_path_find { pathfinder.linvel = Vec2::ZERO; continue; }
         let speed = *(stats.get_stat(StatType::Speed).unwrap_or(&100.0));
-        if ai.get_target_world(&grid).distance_squared(transform.translation.truncate()) <= 10.0 && ai.index < ai.points.len() - 1 {
+        if ai.get_target_world(&grid).distance_squared(transform.translation.truncate()) <= GRID_TOLERANCE && ai.index < ai.points.len() - 1 {
             ai.index += 1;
         }
-        pathfinder.linvel = (ai.get_target_world(&grid) - transform.translation.truncate()).normalize() * speed;
+        pathfinder.linvel = (ai.get_target_world(&grid) - transform.translation.truncate()).normalize_or_zero() * speed;
     }
 }
 

@@ -1,4 +1,3 @@
-use bevy::app::AppExit;
 use bevy::diagnostic::DiagnosticsStore;
 use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
 use bevy::prelude::*;
@@ -23,7 +22,7 @@ impl Plugin for FPSCounter {
     fn build(&self, app: &mut App) {
         app.insert_resource(Debug { show_debug: false });
         app.add_systems(Startup, setup_fps_counter);
-        app.add_systems(Update, (fps_text_update_system, toggle_vsync, listen_for_exit));
+        app.add_systems(Update, (fps_text_update_system, toggle_vsync));
     }
 }
  
@@ -151,12 +150,5 @@ fn toggle_vsync(input: Res<ButtonInput<KeyCode>>, mut windows: Query<&mut Window
             PresentMode::AutoVsync
         };
         info!("PRESENT_MODE: {:?}", window.present_mode);
-    }
-}
-
-fn listen_for_exit(mut exit_evr: EventWriter<AppExit>, input: Res<ButtonInput<KeyCode>>) {
-    let mut pressed = input.get_pressed().copied();
-    if pressed.find(|key| *key == KeyCode::KeyQ).is_some() && pressed.find(|key| *key == KeyCode::ControlLeft).is_some() {
-        exit_evr.send(AppExit);    
     }
 }

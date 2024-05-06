@@ -8,8 +8,6 @@ use crate::entity::{health::Health, damage::DamageType, stats::{Stats, StatType}
 use super::*;
 use rand::Rng;
 
-const POS_ERROR: f32 = 5.0 * 5.0;
-
 fn get_player_pos(player_transform: Result<&Transform, QuerySingleError>) -> Option<Vec2> {
     match player_transform {
         Ok(transform) => Some(transform.translation.truncate()),
@@ -33,13 +31,13 @@ pub struct OrcPlugin;
 impl Plugin for OrcPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, (
-            idle_enter,
+            idle_enter.before(idle_update),
             idle_update,
-            wander_enter,
+            wander_enter.before(wander_update),
             wander_update,
-            chase_enter,
+            chase_enter.before(chase_update),
             chase_update,
-            attack_enter,
+            attack_enter.before(attack_update),
             attack_update,
         ));
     }
@@ -63,25 +61,32 @@ fn idle_update(
     mut commands: Commands,
     mut orcs: Query<(Entity, &mut Enemy), With<OrcIdle>>
 ) {
-    for (en, mut orc_enemy) in orcs.iter_mut() {
-        orc_enemy.action_timer.tick(Duration::from_secs_f32(time.delta_seconds()));
-        if orc_enemy.action_timer.finished() {
-            info!("Removing orc idle!");
-            commands.entity(en).remove::<OrcIdle>().insert(OrcWander);
+    for (entity, mut enemy) in orcs.iter_mut() {
+        enemy.action_timer.tick(Duration::from_secs_f32(time.delta_seconds()));
+        if enemy.action_timer.finished() {
+            match enemy.state_transitions.idle_exit {
+                EnemyState::Wander => { commands.entity(entity).insert(OrcWander); },
+                _ => { info!("Found unhandled transition from idle {:?}", enemy.state_transitions.idle_exit); continue; },
+            }
+            commands.entity(entity).remove::<OrcIdle>();
         }
     }
 }
 
 fn wander_enter(
-    mut orcs: Query<(&mut Enemy, &mut DirectionalAnimator, &mut AITarget, &Transform), Added<OrcWander>>,
+    mut commands: Commands,
+    mut orcs: Query<(Entity, &mut Enemy, &mut DirectionalAnimator, &mut AITarget, &Transform, Option<&AIPath>), Added<OrcWander>>,
     grid: Res<Grid>
 ) {
     let mut rng = rand::thread_rng();
-    for (mut enemy, mut anim, mut ai, transform) in orcs.iter_mut() {
+    for (entity, mut enemy, mut anim, mut ai, transform, path) in orcs.iter_mut() {
         ai.do_path_find = true;
         let angle = rng.gen_range(-2.0 * std::f32::consts::PI..2.0 * std::f32::consts::PI).to_radians();
         let pos = Vec2::new(transform.translation.x + angle.cos() * 100.0, transform.translation.y.sin() * 100.0);
         if let Some(grid_pos) = grid.sample_position(&(transform.translation.truncate() + pos).as_ivec2(), (pos - transform.translation.truncate()).normalize()) {
+            if path.is_some() {
+                commands.entity(entity).remove::<AIPath>();
+            }
             ai.destination = Vec2::new(grid_pos.0 as f32, grid_pos.1 as f32);
             info!("Intialised orc with wander target: ({}, {})", grid_pos.0, grid_pos.1);
         }
@@ -91,31 +96,39 @@ fn wander_enter(
 }
 
 fn wander_update(
+    grid: Res<Grid>,
     mut commands: Commands,
     player_query: Query<&Transform, With<Player>>,
-    mut orcs: Query<(Entity, &Transform, &AITarget, Option<&AIPath>), With<OrcWander>>
+    mut orcs: Query<(Entity, &Enemy, &Transform, &AITarget, Option<&AIPath>), With<OrcWander>>
 ) {
     let Some(player_pos) = get_player_pos(player_query.get_single()) else {
-        for (en, _, _, _) in orcs.iter() {
+        for (en, _, _, _, _) in orcs.iter() {
             commands.entity(en).remove::<OrcWander>().insert(OrcIdle);
         }
         return;
     };
-    for (entity, transform, ai, path) in orcs.iter_mut() {
-        if player_pos.distance_squared(transform.translation.truncate()) <= POS_ERROR {
+    for (entity, enemy, transform, ai, path) in orcs.iter_mut() {
+        if player_pos.distance_squared(transform.translation.truncate()) <= ai.follow_range.powi(2) {
             info!("Player in range!");
             if path.is_some() {
                 commands.entity(entity).remove::<AIPath>();
             }
-            commands.entity(entity).remove::<OrcWander>().insert(OrcChase);
+            match enemy.state_transitions.wander_chase {
+                EnemyState::Chase => { commands.entity(entity).insert(OrcChase); },
+                EnemyState::Attack => { commands.entity(entity).insert(OrcAttack); },
+                _ => { info!("Found unhandled transition from wander {:?}", enemy.state_transitions.wander_chase); continue; },
+            }
+            commands.entity(entity).remove::<OrcWander>();
         }
-        if transform.translation.truncate().distance_squared(ai.destination) <= POS_ERROR {
-            info!("Player ({:?}) is {} away from orc: {:?}", player_pos.distance_squared(transform.translation.truncate()), player_pos, transform.translation.truncate());
+        if transform.translation.truncate().distance_squared(grid.grid_to_world_coords(&ai.destination.as_ivec2())) <= crate::pathfinding::GRID_TOLERANCE.powi(2) {
             if path.is_some() {
                 commands.entity(entity).remove::<AIPath>();
             }
-            commands.entity(entity).remove::<OrcWander>().insert(OrcIdle);
-            info!("Orc {} has reached wander destination!", entity.index());
+            match enemy.state_transitions.wander_idle {
+                EnemyState::Idle => { commands.entity(entity).insert(OrcIdle); },
+                _ => { info!("Found unhandled transition from wander {:?}", enemy.state_transitions.wander_idle); commands.entity(entity).insert(OrcIdle); },
+            }
+            commands.entity(entity).remove::<OrcWander>(); 
             continue;
         }
     }
@@ -134,30 +147,38 @@ fn chase_update(
     grid: Res<Grid>,
     mut commands: Commands,
     player_query: Query<&Transform, With<Player>>,
-    mut orcs: Query<(Entity, &Transform, &mut AITarget, Option<&AIPath>), With<OrcChase>>
+    mut orcs: Query<(Entity, &Enemy, &Transform, &mut AITarget, Option<&AIPath>), With<OrcChase>>
 ) {
     let Some(player_pos) = get_player_pos(player_query.get_single()) else {
-        for (entity, _, _, _) in orcs.iter() {
+        for (entity, _, _, _, _) in orcs.iter() {
             commands.entity(entity).remove::<OrcChase>().insert(OrcIdle);
         }
         return;
     };
-    for (entity, transform, mut ai, path) in orcs.iter_mut() {
+    for (entity, enemy, transform, mut ai, path) in orcs.iter_mut() {
         let distance_to_player = transform.translation.truncate().distance(player_pos);
         if distance_to_player >= ai.follow_range {
             if path.is_some() {
-                commands.entity(entity).remove::<OrcChase>().insert(OrcWander);
+                match enemy.state_transitions.chase_exit {
+                    EnemyState::Wander => { commands.entity(entity).insert(OrcWander); },
+                    _ => { info!("Found unhandled transition from chase exit {:?}", enemy.state_transitions.chase_exit); commands.entity(entity).insert(OrcIdle); },
+                }
+                commands.entity(entity).remove::<OrcChase>();
             }
             continue;
         }
-        if ai.destination.distance_squared(player_pos) >= POS_ERROR {
-            commands.entity(entity).remove::<AIPath>();
+        if grid.grid_to_world_coords(&ai.destination.as_ivec2()).distance_squared(player_pos) >= crate::pathfinding::GRID_TOLERANCE.powi(2) {
             if let Some((pos_x, pos_y)) = grid.sample_position(&player_pos.as_ivec2(), (player_pos - transform.translation.truncate()).normalize()) {
+                commands.entity(entity).remove::<AIPath>();
                 ai.destination = Vec2::new(pos_x as f32, pos_y as f32);
             } 
         }
         if distance_to_player <= ai.attack_range {
-            commands.entity(entity).remove::<OrcChase>().insert(OrcAttack);
+            match enemy.state_transitions.chase_player {
+                EnemyState::Attack => { commands.entity(entity).insert(OrcAttack); },
+                _ => { info!("Found unhandled transition from chase player {:?}", enemy.state_transitions.chase_player); commands.entity(entity).insert(OrcIdle); },
+            }
+            commands.entity(entity).remove::<OrcChase>();
         }
     }
 }
@@ -187,7 +208,11 @@ fn attack_update(
     for (entity, mut enemy) in orcs.iter_mut() {
         enemy.action_timer.tick(Duration::from_secs_f32(time.delta_seconds()));
         if enemy.action_timer.finished() {
-            commands.entity(entity).remove::<OrcAttack>().insert(OrcChase);
+            match enemy.state_transitions.attack_finished {
+                EnemyState::Chase => { commands.entity(entity).insert(OrcChase); },
+                _ => { info!("Found unhandled transition from attack exit {:?}", enemy.state_transitions.attack_finished); continue; }
+            }
+            commands.entity(entity).remove::<OrcAttack>();
         }
     }
 }

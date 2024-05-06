@@ -1,11 +1,9 @@
 use std::io::Write;
 
-use bevy::{prelude::*, render::render_resource::AsBindGroup, sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle}};
+use bevy::prelude::*;
 use rand::Rng;
-use crate::{entity::{damage::DamageType, health::Health}, pathfinding::Grid, WORLD_SIZE};
+use crate::{pathfinding::Grid, WORLD_SIZE};
 use bevy_rapier2d::prelude::*;
-
-static GROUND_DIMENSIONS: Vec2 = Vec2 { x: 1184.0, y: 1312.0 };
 
 #[derive(Debug, Clone, Reflect)]
 pub enum WallType {
@@ -28,56 +26,21 @@ pub struct MapPlugin;
 
 impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
-        app
-            .add_plugins(Material2dPlugin::<Perlin2dMaterial>::default())
-            .add_systems(Startup, (spawn_map, spawn_map_collision.after(spawn_map)))
-            .add_systems(FixedUpdate, (do_void_damage, update_void_shader))
-        ;
-    }
-}
-
-// Set up materials
-#[derive(AsBindGroup, Debug, Clone, Reflect, Asset)]
-pub struct Perlin2dMaterial {
-    #[uniform(0)]
-    time: f32
-}
-
-impl Material2d for Perlin2dMaterial {
-    fn fragment_shader() -> bevy::render::render_resource::ShaderRef {
-        "shaders/perlin2d_material.wgsl".into()
+        app.add_systems(Startup, (spawn_map, spawn_map_collision.after(spawn_map)));
     }
 }
 
 fn spawn_map(
     mut commands: Commands,
     asset_server: ResMut<AssetServer>,
-    mut perlin_materials: ResMut<Assets<Perlin2dMaterial>>,
-    mut meshes: ResMut<Assets<Mesh>>
 ) {
     let mut rng = rand::thread_rng();
 
-    let void = MaterialMesh2dBundle {
-        mesh: bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(Rectangle::default()))),
-        material: perlin_materials.add(Perlin2dMaterial { time: 0.0 }),
-        transform: Transform::from_scale(Vec3::splat(2048.0)).with_translation(Vec2::ZERO.extend(-10.0)),
-        ..default()
-    };
-
-    commands
-        .spawn(void)
-        .insert(Void);
-
-    let ground = SpriteBundle {
+    commands.spawn(SpriteBundle {
         texture: asset_server.load("environment/ground.png"),
         transform: Transform::from_xyz(0.0, 0.0, -9.0),
         ..default()
-    };
-    commands
-        .spawn(ground)
-        .insert(Collider::ball((GROUND_DIMENSIONS.x + GROUND_DIMENSIONS.y) / 4.0))
-        .insert(Ground)
-        .insert(Sensor);
+    });
 
     let angles: [f32; 4] = [
         rng.gen_range(0.0..360.0),
@@ -87,7 +50,7 @@ fn spawn_map(
     ];
 
     for angle in angles {
-        let distance = rng.gen_range(GROUND_DIMENSIONS.x as f32 * 0.5..GROUND_DIMENSIONS.x as f32 * 0.75);
+        let distance = rng.gen_range(256.0..384.0);
         let radius: f32 = match angle.round() as i32 / 90 {
             0 => 32.0,
             1 => 24.0,
@@ -104,19 +67,6 @@ fn spawn_map(
             .spawn(rock_sprite)
             .insert(Collider::ball(radius))
             .insert(Wall { wall_type: WallType::Circle(radius) });
-    }
-}
-
-fn do_void_damage(
-    rapier: Res<RapierContext>,
-    mut health_entities: Query<(Entity, &mut Health), With<Collider>>,
-    ground_q: Query<Entity, (With<Ground>, Without<Health>)>
-) {
-    let Ok(ground) = ground_q.get_single() else { error!("Multiple ground entities?"); return; };
-    for (health_entity, mut health) in health_entities.iter_mut() {
-        if !rapier.intersection_pair(health_entity, ground).unwrap_or(false) {
-            health.push_damage(0.1, DamageType::BYPASS);
-        }
     }
 }
 
@@ -151,8 +101,8 @@ fn spawn_map_collision(
     }
     if let Ok(mut file) = std::fs::File::create("world.world") {
         for row in grid.points {
-            let buf = row.iter().map(|is_wall| if *is_wall { 1 } else { 0 }).collect::<Vec<u8>>();
-            let _ = file.write_all(format!("{:?}\n", buf).as_bytes());
+            let buf = row.iter().map(|is_wall| if *is_wall { String::from("██") } else { String::from("  ") }).collect::<Vec<String>>();
+            let _ = file.write_all(format!("{}\n", buf.join("")).as_bytes());
         }
     }
     info!("Constructed map with wall count: {}", count);
@@ -165,13 +115,5 @@ fn fill_circle(grid: &mut ResMut<'_, Grid>, indices: (usize, usize), radius: usi
                 grid.set_point(x, y, true);
             }
         }
-    }
-}
-
-fn update_void_shader(
-    mut perlin_materials: ResMut<Assets<Perlin2dMaterial>>
-) {
-    for perlin in perlin_materials.iter_mut() {
-        perlin.1.time += 0.02;
     }
 }

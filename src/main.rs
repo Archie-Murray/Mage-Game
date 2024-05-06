@@ -17,7 +17,7 @@ mod ui;
 
 use entity::*;
 
-static WORLD_SIZE: IVec2 = IVec2::new(2048, 2048);
+static WORLD_SIZE: IVec2 = IVec2::new(1024, 1024);
 
 fn main() {
     App::new()

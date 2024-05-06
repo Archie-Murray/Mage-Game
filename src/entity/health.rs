@@ -36,11 +36,12 @@ pub struct Health {
 pub struct DamageInstance {
     amount: f32, 
     damage_type: DamageType,
+    spawn_damage_particles: bool
 }
 
 impl DamageInstance {
-    pub fn new(amount: f32, damage_type: DamageType) -> Self {
-        DamageInstance { amount, damage_type }
+    pub fn new(amount: f32, damage_type: DamageType, spawn_damage_particles: bool) -> Self {
+        DamageInstance { amount, damage_type, spawn_damage_particles }
     }
 }
 
@@ -52,7 +53,7 @@ pub struct DOT {
     pub finished: bool
 }
 
-#[derive(Reflect)]
+#[derive(Reflect, PartialEq, Eq)]
 pub enum EntityType { Player, Enemy, Boss }
 
 impl Clone for EntityType {
@@ -89,8 +90,8 @@ fn on_damage(mut commands: Commands, mut evr: EventReader<HealthDamageEvent>, pa
 #[allow(dead_code)]
 #[derive(Event)]
 pub struct HealthDeathEvent {
-    entity: Entity, 
-    entity_type: EntityType
+    pub entity: Entity, 
+    pub entity_type: EntityType
 }
 
 pub fn health_update(
@@ -103,7 +104,9 @@ pub fn health_update(
     for (mut health, entity, transform) in query.iter_mut() {
         let en_type = health.entity_type.clone();
         for damage_instance in &health.incoming_damage {
-            ev_damage.send(HealthDamageEvent { entity, entity_type: en_type.clone(), amount: damage_instance.amount, pos: transform.translation.truncate() });
+            if damage_instance.spawn_damage_particles {
+                ev_damage.send(HealthDamageEvent { entity, entity_type: en_type.clone(), amount: damage_instance.amount, pos: transform.translation.truncate() });
+            }
             damage_instances.push(damage_instance.clone());
         }
         for damage_instance in damage_instances.iter() {
@@ -123,14 +126,14 @@ pub fn health_update(
 
         for (entity, dot) in health.dots.iter_mut() {
             dot.duration = (dot.duration - time.delta_seconds()).max(0.0);
-            damage_instances.push(DamageInstance::new(dot.tick_damage * time.delta_seconds(), dot.damage_type));
+            damage_instances.push(DamageInstance::new(dot.tick_damage * time.delta_seconds(), dot.damage_type, false));
             if dot.duration == 0.0 {
                 finished.push(*entity);
             }
         }
         
         for damage_instance in damage_instances.iter() {
-            health.push_damage(damage_instance.amount, damage_instance.damage_type);
+            health.incoming_damage.push(*damage_instance);
         }
 
         for id in finished {
@@ -145,7 +148,7 @@ impl Health {
     }
 
     pub fn push_damage(&mut self, amount: f32, damage_type: DamageType) {
-        self.incoming_damage.push(DamageInstance::new(amount, damage_type));
+        self.incoming_damage.push(DamageInstance::new(amount, damage_type, true));
     }
 
     fn damage(&mut self, mut amount: f32, damage_type: DamageType) {
