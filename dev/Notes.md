@@ -1,0 +1,1 @@
+- `bevy_hanabi` has a problem with Z ordering so all player sprites must be on negative z indexes to render behind.

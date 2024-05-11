@@ -34,12 +34,13 @@ fn main() {
                             mode: bevy::window::WindowMode::BorderlessFullscreen,
                             prevent_default_event_handling: false,
                             present_mode: bevy::window::PresentMode::AutoVsync,
-                            .. default()
+                            ..default()
                         }),
                         ..default()
                 }
             ),
         )
+        .insert_resource(ClearColor(Color::BLACK))
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         .insert_resource(RapierConfiguration { gravity: Vec2::ZERO, ..default() })
         .add_plugins(HanabiPlugin)

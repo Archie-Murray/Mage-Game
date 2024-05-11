@@ -40,6 +40,7 @@ pub fn spawn_player(
     let layout_handle = atlases.add(layout);
     let player = commands.spawn((
         Player,
+        Name::new("Player"),
         Health::new(100.0, 10, 10, EntityType::Player),
         DirectionalAnimator {
             animation_indices: HashMap::from([
@@ -72,7 +73,8 @@ pub fn spawn_player(
                 layout: layout_handle,
                 index: 0
             },
-            transform: Transform::from_xyz(50.0, 0.0, 1.0),
+            // NOTE: All bevy_hanabi particles are not z sorted so all entities that go infront of particles must be on negative z positions!
+            transform: Transform::from_xyz(50.0, 0.0, -1.0),
             ..default()
         },
         RigidBody::Dynamic,

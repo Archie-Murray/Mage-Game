@@ -178,7 +178,6 @@ fn use_ability(ability: &mut Ability, origin: &Transform, rotation: Quat, mut co
     ability.cooldown_timer.set_duration(Duration::from_secs_f32(ability.ability_data.cooldown));
     ability.cooldown_timer.reset();
     if let Some(mut ability_sprite) = ability_sprites.sprites.get_mut(&ability.ability_data.ability_type).cloned() {
-        println!("Spawning ability: {:?}", ability.ability_data.ability_type);
         let (_, _, angle) = rotation.to_euler(EulerRot::XYZ);
         ability_sprite.transform.translation = origin.translation + rotation.mul_vec3(Vec3::new(1.0, 0.0, 0.0)) * 64.0;
         match ability.ability_data.ability_type {
@@ -187,7 +186,7 @@ fn use_ability(ability: &mut Ability, origin: &Transform, rotation: Quat, mut co
                          rb, constraints, coll, sensor , vel, ability, auto_destroy
                 ) = (
                     ability_sprite, 
-                    Damage { damage_amount: ability.ability_data.magnitude, damage_type: DamageType::MAGICAL }, 
+                    Damage { damage_amount: ability.ability_data.magnitude, damage_type: DamageType::MAGICAL, damaged_entities: Vec::new() }, 
                     LoopingAnimator::new(4, 0.2),
                     RigidBody::Dynamic,
                     LockedAxes::ROTATION_LOCKED,
@@ -196,7 +195,7 @@ fn use_ability(ability: &mut Ability, origin: &Transform, rotation: Quat, mut co
                     Velocity { linvel: Vec2::from_angle(angle) * ability.ability_data.speed, angvel: 0.0 },
                     AbilityTag { ability_type: ability.ability_data.ability_type },
                     AutoDestroy::new(2.0)
-                ); 
+                );
                 ability_instance.transform.rotation = rotation;
                 let Some(particle_effect) = ability_particles.particle_effects.get(&ParticleType::FireBall) else { return; };
                 let particles = commands.spawn(ParticleEffectBundle { effect: ParticleEffect::new(particle_effect.clone()), transform: Transform::from_xyz(0.0, 0.0, 1.0), ..Default::default() }).id();
@@ -258,24 +257,22 @@ pub fn player_heal(
     for (heal, heal_entity) in heal_query.iter() {
         if rapier.intersection_pair(player_entity, heal_entity).is_some() {
             player_health.heal(heal.heal_amount);
-            println!("Healed player for {}", heal.heal_amount);
             commands.entity(heal_entity).despawn_recursive();
         }
     }
 }
 
 pub fn player_damage(
-    mut commands: Commands,
     mut health_query: Query<(&mut Health, Entity), (With<Collider>, Without<Player>)>,
-    damage_query: Query<(&Damage, Entity), (With<AbilityTag>, With<Collider>)>,
+    mut damage_query: Query<(&mut Damage, Entity), (With<AbilityTag>, With<Collider>)>,
     rapier: Res<RapierContext>
 ) {
     for (mut enemy_health, enemy_entity) in health_query.iter_mut() {
-        for (damage, damage_entity) in damage_query.iter() {
+        for (mut damage, damage_entity) in damage_query.iter_mut() {
+            if damage.damaged_entities.contains(&enemy_entity.index()) { continue; }
             if rapier.intersection_pair(enemy_entity, damage_entity).is_some() {
                 enemy_health.push_damage(damage.damage_amount, damage.damage_type);
-                println!("Damaged entity: {}", enemy_entity.index());
-                commands.entity(enemy_entity).despawn_recursive();
+                damage.damaged_entities.push(enemy_entity.index());
                 break;
             }
         }
@@ -333,10 +330,11 @@ pub struct Slow {
     pub duration: f32
 }
 
-#[derive(Component)]
+#[derive(Component, Debug)]
 pub struct Damage {
     pub damage_amount: f32,
-    pub damage_type: DamageType
+    pub damage_type: DamageType,
+    pub damaged_entities: Vec<u32>
 }
 
 #[derive(Component)]

@@ -3,6 +3,7 @@ use bevy_hanabi::{ParticleEffect, ParticleEffectBundle};
 use crate::abilities::abilities::AutoDestroy;
 use crate::entity::particles::ParticleType;
 use crate::entity::particles::Particles;
+use crate::player::Player;
 use super::damage::*;
 use bevy::utils::hashbrown::HashMap;
 
@@ -14,7 +15,7 @@ impl Plugin for HealthPlugin {
             .add_event::<HealthDamageEvent>()
             .add_event::<HealthDeathEvent>()
             .register_type::<Health>()
-            .add_systems(Update, (health_update, on_damage));
+            .add_systems(Update, (health_update, death_update, on_damage));
     }
 }
 
@@ -76,14 +77,15 @@ pub struct HealthDamageEvent {
 }
 
 fn on_damage(mut commands: Commands, mut evr: EventReader<HealthDamageEvent>, particles: Res<Particles>) {
-    let Some(effect) = particles.effects.get(&ParticleType::Hit) else { return; };
+    if evr.is_empty() { return; }
+    let Some(effect) = particles.get_particle(ParticleType::Hit) else { return; };
     for event in evr.read() {
         info!("{} was damaged!", event.entity.index());
         commands.spawn(ParticleEffectBundle {
             effect: ParticleEffect::new(effect.clone()),
-            transform: Transform::from_translation(event.pos.extend(10.0)).with_scale(Vec3::splat(10.0)),
+            transform: Transform::from_scale(Vec3::splat(10.0)).with_translation(event.pos.extend(10.0)),
             ..Default::default()
-        }).insert(AutoDestroy::new(10.0));
+        }).insert(AutoDestroy::new(0.25));
     }
 }
 
@@ -92,6 +94,28 @@ fn on_damage(mut commands: Commands, mut evr: EventReader<HealthDamageEvent>, pa
 pub struct HealthDeathEvent {
     pub entity: Entity, 
     pub entity_type: EntityType
+}
+
+pub fn death_update(
+    mut commands: Commands,
+    mut player_q: Query<(&mut Health, &Transform), With<Player>>,
+    mut evr_death: EventReader<HealthDeathEvent>,
+    particles: Res<Particles>
+) {
+    if evr_death.is_empty() { return; }
+    let Ok((mut player_health, player_transform)) = player_q.get_single_mut() else { return; };
+    for death_event in evr_death.read() {
+        if death_event.entity_type == EntityType::Player { continue; }
+        player_health.heal(5.0);
+        if let Some(effect_handle) = particles.get_particle(ParticleType::Heal) {
+            commands.spawn(ParticleEffectBundle {
+                effect: ParticleEffect::new(effect_handle),
+                transform: Transform::from_translation(player_transform.translation.truncate().extend(11.0)),
+                ..Default::default()
+            }).insert(AutoDestroy::new(0.5));
+        }
+        commands.entity(death_event.entity).despawn_recursive();
+    }
 }
 
 pub fn health_update(

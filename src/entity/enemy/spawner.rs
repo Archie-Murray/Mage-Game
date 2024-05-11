@@ -55,7 +55,8 @@ pub fn update_spawners(
         if spawner.spawn_timer.just_finished() {
             let enemy = Enemy::new(spawner.enemy_type);
             let position_index = rand::thread_rng().gen_range(0..spawner.spawn_points.len());
-            let enemy_transform = Transform::from_xyz(spawner.spawn_points[position_index].x, spawner.spawn_points[position_index].y, 1.0);
+            // NOTE: All bevy_hanabi particles are not z sorted so all entities that go infront of particles must be on negative z positions!
+            let enemy_transform = Transform::from_xyz(spawner.spawn_points[position_index].x, spawner.spawn_points[position_index].y, -1.0);
             match spawner.enemy_type {
                 EnemyType::Orc => {
                     let orc = data::orc_data();
@@ -92,6 +93,7 @@ pub fn update_spawners(
                         .insert(AITarget::new(256.0, 16.0, false))
                         .insert(Sensor)
                         .insert(Enemy::new(EnemyType::Orc))
+                        .insert(Name::new(format!("Orc {}", spawner.spawn_count)))
                     .id();
                     let health_bar = commands.spawn(HealthBarBundle::new(data::orc_data().health.get_max(), assets.load("ui/health_bar.png"), Vec2::new(0.0, 32.0))).id();
                     commands.entity(enemy).push_children(&[health_bar]);

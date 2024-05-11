@@ -36,11 +36,20 @@ fn spawn_map(
 ) {
     let mut rng = rand::thread_rng();
 
-    commands.spawn(SpriteBundle {
+    let vertical_wall: Handle<Image> = asset_server.load("environment/vertical_wall.png");
+    let horizontal_wall: Handle<Image> = asset_server.load("environment/horizontal_wall.png");
+    
+    let walls = [
+        commands.spawn((SpriteBundle { transform: Transform::from_xyz(         0.0,  512.0 + 8.0, 10.0), texture: horizontal_wall.clone(), ..default() }, Name::new("Top Wall"), Collider::cuboid(512.0, 8.0))).id(), //TOP
+        commands.spawn((SpriteBundle { transform: Transform::from_xyz(         0.0, -512.0 - 8.0, 10.0), texture: horizontal_wall.clone(), ..default() }, Name::new("Bottom Wall"), Collider::cuboid(512.0, 8.0))).id(), //BOTTOM
+        commands.spawn((SpriteBundle { transform: Transform::from_xyz( 512.0 + 8.0,          0.0, 10.0),   texture: vertical_wall.clone(), ..default() }, Name::new("Right Wall"), Collider::cuboid(8.0, 512.0))).id(), //RIGHT
+        commands.spawn((SpriteBundle { transform: Transform::from_xyz(-512.0 - 8.0,          0.0, 10.0),   texture: vertical_wall.clone(), ..default() }, Name::new("Left Wall"), Collider::cuboid(8.0, 512.0))).id(), //LEFT
+    ];
+    commands.spawn((SpriteBundle {
         texture: asset_server.load("environment/ground.png"),
         transform: Transform::from_xyz(0.0, 0.0, -9.0),
         ..default()
-    });
+    }, Name::new("Ground"))).insert_children(0, &walls);
 
     let angles: [f32; 4] = [
         rng.gen_range(0.0..360.0),
@@ -60,12 +69,13 @@ fn spawn_map(
         };
         let rock_sprite = SpriteBundle {
             texture: asset_server.load(format!("environment/rock{}.png", angle.round() as i32 / 90)),
-            transform: Transform::from_xyz(distance * angle.to_radians().sin(), distance * angle.to_radians().cos(), -9.0),
+            transform: Transform::from_xyz(distance * angle.to_radians().sin(), distance * angle.to_radians().cos(), -8.0),
             ..default()
         };
         commands
             .spawn(rock_sprite)
             .insert(Collider::ball(radius))
+            .insert(Name::new(format!("Rock {}", angle.round() as i32 / 90)))
             .insert(Wall { wall_type: WallType::Circle(radius) });
     }
 }
