@@ -15,20 +15,20 @@ fn get_player_pos(player_transform: Result<&Transform, QuerySingleError>) -> Opt
     }
 }
 
-#[derive(Component)]
-pub struct OrcIdle;
-#[derive(Component)]
-pub struct OrcWander;
-#[derive(Component)]
-pub struct OrcChase;
-#[derive(Component)]
-pub struct OrcAttack;
-#[derive(Component)]
-pub struct OrcDeath;
+#[derive(Component, Reflect, Debug, Clone)]
+pub struct Idle;
+#[derive(Component, Reflect, Debug, Clone)]
+pub struct Wander;
+#[derive(Component, Reflect, Debug, Clone)]
+pub struct Chase;
+#[derive(Component, Reflect, Debug, Clone)]
+pub struct Attack;
+#[derive(Component, Reflect, Debug, Clone)]
+pub struct Death;
 
-pub struct OrcPlugin;
+pub struct EnemyStateMachinePlugin;
 
-impl Plugin for OrcPlugin {
+impl Plugin for EnemyStateMachinePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, (
             idle_enter.before(idle_update),
@@ -44,7 +44,7 @@ impl Plugin for OrcPlugin {
 }
 
 fn idle_enter(
-    mut enemies: Query<(&mut Enemy, &mut DirectionalAnimator, &mut AITarget), Added<OrcIdle>>
+    mut enemies: Query<(&mut Enemy, &mut DirectionalAnimator, &mut AITarget), Added<Idle>>
 ) {
     let mut rng = rand::thread_rng();
     for (mut enemy, mut anim, mut ai) in enemies.iter_mut() {
@@ -59,23 +59,19 @@ fn idle_enter(
 fn idle_update(
     time: Res<Time>,
     mut commands: Commands,
-    mut orcs: Query<(Entity, &mut Enemy), With<OrcIdle>>
+    mut orcs: Query<(Entity, &mut Enemy), With<Idle>>
 ) {
     for (entity, mut enemy) in orcs.iter_mut() {
         enemy.action_timer.tick(Duration::from_secs_f32(time.delta_seconds()));
         if enemy.action_timer.finished() {
-            match enemy.state_transitions.idle_exit {
-                EnemyState::Wander => { commands.entity(entity).insert(OrcWander); },
-                _ => { info!("Found unhandled transition from idle {:?}", enemy.state_transitions.idle_exit); continue; },
-            }
-            commands.entity(entity).remove::<OrcIdle>();
+            commands.entity(entity).remove::<Idle>();
         }
     }
 }
 
 fn wander_enter(
     mut commands: Commands,
-    mut orcs: Query<(Entity, &mut Enemy, &mut DirectionalAnimator, &mut AITarget, &Transform, Option<&AIPath>), Added<OrcWander>>,
+    mut orcs: Query<(Entity, &mut Enemy, &mut DirectionalAnimator, &mut AITarget, &Transform, Option<&AIPath>), Added<Wander>>,
     grid: Res<Grid>
 ) {
     let mut rng = rand::thread_rng();
@@ -99,11 +95,11 @@ fn wander_update(
     grid: Res<Grid>,
     mut commands: Commands,
     player_query: Query<&Transform, With<Player>>,
-    mut orcs: Query<(Entity, &Enemy, &Transform, &AITarget, Option<&AIPath>), With<OrcWander>>
+    mut orcs: Query<(Entity, &Enemy, &Transform, &AITarget, Option<&AIPath>), With<Wander>>
 ) {
     let Some(player_pos) = get_player_pos(player_query.get_single()) else {
         for (en, _, _, _, _) in orcs.iter() {
-            commands.entity(en).remove::<OrcWander>().insert(OrcIdle);
+            commands.entity(en).remove::<Wander>().insert(Idle);
         }
         return;
     };
@@ -113,29 +109,22 @@ fn wander_update(
             if path.is_some() {
                 commands.entity(entity).remove::<AIPath>();
             }
-            match enemy.state_transitions.wander_chase {
-                EnemyState::Chase => { commands.entity(entity).insert(OrcChase); },
-                EnemyState::Attack => { commands.entity(entity).insert(OrcAttack); },
-                _ => { info!("Found unhandled transition from wander {:?}", enemy.state_transitions.wander_chase); continue; },
-            }
-            commands.entity(entity).remove::<OrcWander>();
+            enemy.state_transitions.wander_chase.clone().spawn(entity, &mut commands);
+            commands.entity(entity).remove::<Wander>();
         }
         if transform.translation.truncate().distance_squared(grid.grid_to_world_coords(&ai.destination.as_ivec2())) <= crate::pathfinding::GRID_TOLERANCE.powi(2) {
             if path.is_some() {
                 commands.entity(entity).remove::<AIPath>();
             }
-            match enemy.state_transitions.wander_idle {
-                EnemyState::Idle => { commands.entity(entity).insert(OrcIdle); },
-                _ => { info!("Found unhandled transition from wander {:?}", enemy.state_transitions.wander_idle); commands.entity(entity).insert(OrcIdle); },
-            }
-            commands.entity(entity).remove::<OrcWander>(); 
+            enemy.state_transitions.wander_idle.clone().spawn(entity, &mut commands);
+            commands.entity(entity).remove::<Wander>(); 
             continue;
         }
     }
 }
 
 fn chase_enter(
-    mut anims: Query<(&mut DirectionalAnimator, &mut AITarget), Added<OrcChase>>
+    mut anims: Query<(&mut DirectionalAnimator, &mut AITarget), Added<Chase>>
 ) {
     for (mut anim, mut ai) in anims.iter_mut() {
         ai.do_path_find = true;
@@ -147,11 +136,11 @@ fn chase_update(
     grid: Res<Grid>,
     mut commands: Commands,
     player_query: Query<&Transform, With<Player>>,
-    mut orcs: Query<(Entity, &Enemy, &Transform, &mut AITarget, Option<&AIPath>), With<OrcChase>>
+    mut orcs: Query<(Entity, &Enemy, &Transform, &mut AITarget, Option<&AIPath>), With<Chase>>
 ) {
     let Some(player_pos) = get_player_pos(player_query.get_single()) else {
         for (entity, _, _, _, _) in orcs.iter() {
-            commands.entity(entity).remove::<OrcChase>().insert(OrcIdle);
+            commands.entity(entity).remove::<Chase>().insert(Idle);
         }
         return;
     };
@@ -159,11 +148,8 @@ fn chase_update(
         let distance_to_player = transform.translation.truncate().distance(player_pos);
         if distance_to_player >= ai.follow_range {
             if path.is_some() {
-                match enemy.state_transitions.chase_exit {
-                    EnemyState::Wander => { commands.entity(entity).insert(OrcWander); },
-                    _ => { info!("Found unhandled transition from chase exit {:?}", enemy.state_transitions.chase_exit); commands.entity(entity).insert(OrcIdle); },
-                }
-                commands.entity(entity).remove::<OrcChase>();
+                enemy.state_transitions.chase_exit.clone().spawn(entity, &mut commands);
+                commands.entity(entity).remove::<Chase>();
             }
             continue;
         }
@@ -174,18 +160,15 @@ fn chase_update(
             } 
         }
         if distance_to_player <= ai.attack_range {
-            match enemy.state_transitions.chase_player {
-                EnemyState::Attack => { commands.entity(entity).insert(OrcAttack); },
-                _ => { info!("Found unhandled transition from chase player {:?}", enemy.state_transitions.chase_player); commands.entity(entity).insert(OrcIdle); },
-            }
-            commands.entity(entity).remove::<OrcChase>();
+            enemy.state_transitions.chase_player.clone().spawn(entity, &mut commands);
+            commands.entity(entity).remove::<Chase>();
         }
     }
 }
 
 fn attack_enter(
     mut player_query: Query<&mut Health, With<Player>>,
-    mut orcs: Query<(&mut Enemy, &mut DirectionalAnimator, &Stats), Added<OrcAttack>>
+    mut orcs: Query<(&mut Enemy, &mut DirectionalAnimator, &Stats), Added<Attack>>
 ) {
     let Some(mut player_health) = (match player_query.get_single_mut() {
         Ok(health) => Some(health),
@@ -203,16 +186,13 @@ fn attack_enter(
 fn attack_update(
     time: Res<Time>,
     mut commands: Commands,
-    mut orcs: Query<(Entity, &mut Enemy), With<OrcAttack>>
+    mut orcs: Query<(Entity, &mut Enemy), With<Attack>>
 ) {
     for (entity, mut enemy) in orcs.iter_mut() {
         enemy.action_timer.tick(Duration::from_secs_f32(time.delta_seconds()));
         if enemy.action_timer.finished() {
-            match enemy.state_transitions.attack_finished {
-                EnemyState::Chase => { commands.entity(entity).insert(OrcChase); },
-                _ => { info!("Found unhandled transition from attack exit {:?}", enemy.state_transitions.attack_finished); continue; }
-            }
-            commands.entity(entity).remove::<OrcAttack>();
+            enemy.state_transitions.attack_finished.clone().spawn(entity, &mut commands);
+            commands.entity(entity).remove::<Attack>();
         }
     }
 }

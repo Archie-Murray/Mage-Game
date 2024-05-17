@@ -1,6 +1,8 @@
-use bevy::prelude::*;
+use bevy::{ecs::system::EntityCommands, prelude::*};
 use bevy_rapier2d::dynamics::Velocity;
 use crate::{animation::directional_animator::{vec2_to_direction, AnimationType, DirectionalAnimator}, health::{EntityType, Health, HealthDeathEvent}, player::Player};
+
+use self::orc::*;
 
 pub mod spawner;
 pub mod orc;
@@ -15,8 +17,26 @@ pub struct Enemy {
     pub state_transitions: StateTransitions,
 }
 
-#[derive(Debug, Clone, Copy, Reflect)]
-pub enum EnemyState { Idle, Wander, Chase, Attack, Death }
+#[derive(Debug, Clone, Reflect)]
+pub enum EnemyState { 
+    Idle, 
+    Wander, 
+    Chase, 
+    Attack, 
+    Death
+}
+
+impl EnemyState {
+    pub fn spawn(self, entity: Entity, commands: &mut Commands) {
+        match self.clone() {
+            EnemyState::Idle => { commands.entity(entity).insert(Idle); },
+            EnemyState::Wander => { commands.entity(entity).insert(Wander); },
+            EnemyState::Chase => { commands.entity(entity).insert(Chase); },
+            EnemyState::Attack => { commands.entity(entity).insert(Attack); },
+            EnemyState::Death => { commands.entity(entity).insert(Death); },
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, Reflect)]
 pub enum EnemyType { Orc }
@@ -32,7 +52,7 @@ impl Enemy {
     }
 }
 
-#[derive(Debug, Clone, Copy, Reflect)]
+#[derive(Debug, Clone, Reflect)]
 pub struct StateTransitions {
     pub idle_exit: EnemyState,
     pub wander_idle: EnemyState,
@@ -72,7 +92,7 @@ pub fn enemy_spawn_init(
     for spawned_enemy in spawned_enemies.read() {
         info!("Spawn init!");
         match spawned_enemy.enemy_type {
-            EnemyType::Orc => { commands.entity(spawned_enemy.entity).insert(orc::OrcIdle); },
+            EnemyType::Orc => { commands.entity(spawned_enemy.entity).insert(orc::Idle); },
         }
     }
 }

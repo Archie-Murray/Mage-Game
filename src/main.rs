@@ -50,7 +50,7 @@ fn main() {
         .add_plugins(abilities::ability_particles::ParticlePlugin)
         .add_plugins(ui::UIPlugin)
         .add_plugins(entity::EntityPlugin)
-        .add_plugins(enemy::orc::OrcPlugin)
+        .add_plugins(enemy::orc::Plugin)
         .register_type::<enemy::Enemy>()
         .add_plugins(pathfinding::PathfindingPlugin)
         .add_plugins(GamePlugin)
